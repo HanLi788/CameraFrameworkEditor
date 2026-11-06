@@ -1,0 +1,20 @@
+import {useEffect,useRef,useState} from 'react';
+import {Asset,typeNames} from './types';
+import CurveEditor from './CurveEditor';
+import Icon,{IconButton,assetIcons} from './Icon';
+export default function AssetSlot({value,type,assets,onChange,onNavigate,label}:any){
+  const [picker,setPicker]=useState(false),[query,setQuery]=useState(''),[showRefs,setShowRefs]=useState(false),[error,setError]=useState('');
+  const timer=useRef<any>(null);useEffect(()=>()=>clearTimeout(timer.current),[]);
+  const asset=assets.find((a:Asset)=>a.id===value),curve=type==='Curve'||asset?.type==='Curve';
+  const choices=assets.filter((a:Asset)=>!type||a.type===type);
+  const choose=(id:string)=>{const a=assets.find((a:Asset)=>a.id===id);if(id&&(!a||type&&a.type!==type)){setError('资产类型不匹配');return;}onChange(id);setPicker(false);setError('');};
+  const users=assets.filter((a:Asset)=>a.refs.some(r=>r.id===value));
+  return <div className={'asset-slot '+(curve?'curve-slot':'')} data-field={label} onDragOver={e=>{e.preventDefault();e.dataTransfer.dropEffect='link';}} onDrop={e=>{e.preventDefault();choose(e.dataTransfer.getData('application/x-camera-asset')||e.dataTransfer.getData('text/plain'));}}>
+    <div className="slot-heading"><span>{label.split('.').at(-1)}</span><small>{typeNames[type]||'资产引用'}</small></div>
+    <div className="slot-body"><button className={'slot-icon type-'+(type||asset?.type)} aria-label={'选择 '+label} title="单击选择，双击打开资产编辑器" onClick={()=>{clearTimeout(timer.current);timer.current=setTimeout(()=>setPicker(true),250);}} onDoubleClick={()=>{clearTimeout(timer.current);if(asset)onNavigate(value);}}><Icon name={assetIcons[type||asset?.type]||'file'} size={28}/></button><div className="slot-name">{curve?<select aria-label={'选择曲线 '+label} value={value} onChange={e=>choose(e.target.value)}>{!choices.some((a:Asset)=>a.id===value)&&<option value={value}>{value||'请选择曲线'}</option>}{choices.map((a:Asset)=><option key={a.id} value={a.id}>{a.data?.Name||a.id}</option>)}</select>:<b>{asset?.data?.Name||value||'未挂载资产'}</b>}<small>{asset?.path||'选择或拖入资产'}</small></div></div>
+    <div className="slot-actions"><IconButton icon="replace" label={'替换 '+label} onClick={()=>setPicker(true)}/><IconButton icon="open" label={'打开 '+label} disabled={!asset} onClick={()=>onNavigate(value)}/><IconButton icon="locate" label={'定位 '+label} title="在内容浏览器中定位" disabled={!asset} onClick={()=>window.cameraEditor.reveal(asset.path).catch((e:any)=>setError(e.message))}/><IconButton icon="link" label={'查看引用 '+label} disabled={!asset} onClick={()=>setShowRefs(v=>!v)}><small>{users.length}</small></IconButton>{!curve&&<IconButton icon="close" label={'清除 '+label} disabled={!value} onClick={()=>choose('')}/>}</div>
+    {error&&<div className="notice">{error}</div>}{showRefs&&<div className="slot-users">{users.length?users.map((a:Asset)=><button key={a.id} title={'打开 '+a.id} onClick={()=>onNavigate(a.id)}>{a.id}<Icon name="open"/></button>):<small>没有引用方</small>}</div>}
+    {curve&&asset?.data&&<div className="inline-curve"><CurveEditor compact readOnly data={asset.data}/><div className="inline-curve-footer"><span><Icon name="lock" size={12}/> 只读预览 · {asset.data.ParentType}</span></div></div>}
+    {picker&&<div className="modal-overlay" onClick={e=>e.stopPropagation()}><div className="modal asset-picker"><h2>选择{typeNames[type]||'引用资产'}</h2><input autoFocus aria-label="筛选引用资产" placeholder="名称或资产 ID" value={query} onChange={e=>setQuery(e.target.value)}/><div className="picker-list">{choices.filter((a:Asset)=>`${a.id} ${a.data?.Name||''}`.toLowerCase().includes(query.toLowerCase())).map((a:Asset)=><button key={a.id} onClick={()=>choose(a.id)}><span className={'type-'+a.type}><Icon name={assetIcons[a.type]} size={28}/></span><div><b>{a.data?.Name||a.id}</b><small>{a.path}</small></div>{a.id===value&&<Icon name="check"/>}</button>)}</div><div className="modal-actions"><IconButton icon="close" label="取消" onClick={()=>setPicker(false)}>取消</IconButton></div></div></div>}
+  </div>;
+}

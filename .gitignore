@@ -1,0 +1,42 @@
+# Dependencies and generated builds
+node_modules/
+/dist/
+/release/
+.vite/
+.cache/
+*.tsbuildinfo
+
+# Test output and coverage
+/test-results/
+/playwright-report/
+/blob-report/
+/coverage/
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# Local environment settings (keep shareable templates)
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.template
+
+# Machine-specific shortcuts and IDE state
+*.lnk
+.idea/
+.vs/
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Keep package-lock.json and runtime/ binaries/licenses versioned.

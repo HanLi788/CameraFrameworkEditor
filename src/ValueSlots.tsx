@@ -1,0 +1,11 @@
+import AssetSlot from './AssetSlot';
+import {IconButton} from './Icon';
+export default function ValueSlots({value,onChange,assets,onNavigate}:any){
+  const update=(index:number,slot:any)=>onChange(value.map((v:any,i:number)=>i===index?slot:v));
+  const move=(index:number,step:number)=>{const next=[...value];[next[index],next[index+step]]=[next[index+step],next[index]];onChange(next);};
+  return <div className="value-slots"><p>未传入 ID 时使用第一槽。ID 是当前过渡的选择键，目标槽不会依次播放；退出过渡使用自身默认槽。</p>{value.map((slot:any,i:number)=><section className="value-target" key={i} data-value-slot={i}>
+    <header><b>目标 {i+1}</b>{i===0&&<span className="badge">默认</span>}<div className="spacer"/><IconButton icon="up" label={`上移目标 ${i+1}`} disabled={i===0} onClick={()=>move(i,-1)}/><IconButton icon="down" label={`下移目标 ${i+1}`} disabled={i===value.length-1} onClick={()=>move(i,1)}/><IconButton icon="close" label={`移除目标 ${i+1}`} disabled={value.length===1} onClick={()=>onChange(value.filter((_:any,n:number)=>n!==i))}/></header>
+    <div className="value-key"><label><input type="checkbox" aria-label={`目标 ${i+1} 使用业务 ID`} checked={slot.Id!==undefined} onChange={e=>{const next={...slot};if(e.target.checked)next.Id=10001+i;else delete next.Id;update(i,next);}}/>业务 ID</label>{slot.Id!==undefined&&<><select aria-label={`目标 ${i+1} ID 类型`} value={typeof slot.Id} onChange={e=>{const numeric=Number(slot.Id);update(i,{...slot,Id:e.target.value==='string'?String(slot.Id):Number.isSafeInteger(numeric)?numeric:10001+i});}}><option value="number">整数</option><option value="string">字符串</option></select><input aria-label={`目标 ${i+1} ID`} type={typeof slot.Id==='number'?'number':'text'} step="1" value={slot.Id} onChange={e=>{if(typeof slot.Id==='number'){if(!e.target.value.trim()||!Number.isSafeInteger(Number(e.target.value)))return;update(i,{...slot,Id:Number(e.target.value)});}else update(i,{...slot,Id:e.target.value});}}/></>}</div>
+    <AssetSlot value={slot.AssetId} type="Value" assets={assets} label={`ValueAssets.${i}.AssetId`} onNavigate={onNavigate} onChange={(AssetId:string)=>update(i,{...slot,AssetId})}/>
+  </section>)}<IconButton icon="plus" label="添加目标槽" disabled={!assets.some((a:any)=>a.type==='Value')} onClick={()=>onChange([...value,{AssetId:assets.find((a:any)=>a.type==='Value').id}])}>添加目标槽</IconButton></div>;
+}
