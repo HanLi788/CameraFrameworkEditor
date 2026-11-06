@@ -1,3 +1,4 @@
+import {t,tt} from './i18n';
 import {useState} from 'react';
 export function curveY(data:any,x:number){
   if(data.ParentType==='Bezier'){
@@ -13,7 +14,7 @@ export function curveTemplate(parentType:string){return parentType==='Bezier'?{S
 export default function CurveEditor({data,onChange,compact=false,readOnly=false}:{data:any;onChange?:(v:any)=>void;compact?:boolean;readOnly?:boolean}){
   const [draft,setDraft]=useState<any>(null);const [hover,setHover]=useState(.5);const shown=draft||data;
   const points=shown.ParentType==='Bezier'?[shown.P1,shown.P2,shown.P3,shown.P4]:shown.Points;
-  if(!Array.isArray(points)||points.some(p=>!p||typeof p.X!=='number'||typeof p.Y!=='number'))return <div className="notice">控制点无效，请在右侧或源码中修复。</div>;
+  if(!Array.isArray(points)||points.some(p=>!p||typeof p.X!=='number'||typeof p.Y!=='number'))return <div className="notice">{t("控制点无效，请在右侧或源码中修复。")}</div>;
   const pos=(x:number,y:number)=>`${60+x*700},${330-y*280}`;
   const graph=Array.from({length:241},(_,i)=>{const x=i/240;return (i?'L':'M')+pos(x,curveY(shown,x));}).join(' ');
   function coordinates(svg:SVGSVGElement,event:any){const point=svg.createSVGPoint();point.x=event.clientX;point.y=event.clientY;return point.matrixTransform(svg.getScreenCTM()!.inverse());}
@@ -27,13 +28,13 @@ export default function CurveEditor({data,onChange,compact=false,readOnly=false}
     const cancel=()=>{setDraft(null);e.target.removeEventListener('pointermove',move);e.target.removeEventListener('pointerup',end);e.target.removeEventListener('pointercancel',cancel);};
     e.target.addEventListener('pointermove',move);e.target.addEventListener('pointerup',end);e.target.addEventListener('pointercancel',cancel);
   }
-  return <div className={'curve-editor '+(compact?'compact':'')} data-readonly={readOnly}>{!compact&&<><div className="section-kicker">CURVE EDITOR / {data.ParentType}</div><h2>{data.Name||'曲线'}</h2><p>{readOnly?'只读曲线预览。':'拖动节点或编辑精确参数，保存会更新当前曲线资产。'}</p></>}
-    <svg viewBox="0 0 820 390" role={readOnly?'img':undefined} aria-label={readOnly?'曲线只读预览':'曲线编辑图'} onPointerMove={e=>setHover(Math.max(0,Math.min(1,(coordinates(e.currentTarget,e).x-60)/700)))}>
+  return <div className={'curve-editor '+(compact?'compact':'')} data-readonly={readOnly}>{!compact&&<><div className="section-kicker">CURVE EDITOR / {data.ParentType}</div><h2>{data.Name||t('曲线')}</h2><p>{readOnly?t('只读曲线预览。'):t('拖动节点或编辑精确参数，保存会更新当前曲线资产。')}</p></>}
+    <svg viewBox="0 0 820 390" role={readOnly?'img':undefined} aria-label={readOnly?t('曲线只读预览'):t('曲线编辑图')} onPointerMove={e=>setHover(Math.max(0,Math.min(1,(coordinates(e.currentTarget,e).x-60)/700)))}>
       {Array.from({length:11},(_,i)=><g key={i}><path d={`M${60+i*70},50 V330 M60,${50+i*28} H760`} stroke="#303640" strokeWidth={i%5===0?1.5:.6}/>{i%2===0&&<><text x={60+i*70} y="355">{(i/10).toFixed(1)}</text><text x="35" y={335-i*28}>{(i/10).toFixed(1)}</text></>}</g>)}
       {shown.ParentType==='Bezier'&&<path d={`M${pos(points[0].X,points[0].Y)} L${pos(points[1].X,points[1].Y)} M${pos(points[2].X,points[2].Y)} L${pos(points[3].X,points[3].Y)}`} stroke="#838d9b" strokeDasharray="5 4"/>}
       <path d={graph} fill="none" stroke="#73d4c0" strokeWidth="3"/>
       <path d={`M${60+hover*700},50 V330`} stroke="#535d6b" strokeDasharray="3 4"/>
       {points.map((p:any,i:number)=><g key={i}><circle cx={60+p.X*700} cy={330-p.Y*280} r={readOnly?4:7} fill="#161b22" stroke={readOnly?'#7c9790':'#ecba75'} strokeWidth="3" onPointerDown={readOnly?undefined:e=>drag(e,i)} style={{cursor:readOnly?'default':'grab',touchAction:readOnly?'auto':'none'}}/>{!readOnly&&<text x={60+p.X*700+12} y={330-p.Y*280-9}>{i+1}</text>}</g>)}
-    </svg><div className="curve-readout"><span>X <b>{hover.toFixed(3)}</b></span><span>Y <b>{curveY(shown,hover).toFixed(3)}</b></span><span>{points.length} 个控制点</span></div>
+    </svg><div className="curve-readout"><span>X <b>{hover.toFixed(3)}</b></span><span>Y <b>{curveY(shown,hover).toFixed(3)}</b></span><span>{points.length}{t("个控制点")}</span></div>
   </div>;
 }

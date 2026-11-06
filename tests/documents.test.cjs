@@ -17,7 +17,7 @@ test('saving a curve updates the same file without creating assets or changing r
   for(const old of originals)assert.equal((await p.read(old.path)).text,old.text);
 });
 test('replacing a curve reference saves only the parent and leaves curve definitions unchanged',async()=>{
-  const a=snap.assets.find(a=>a.path==='Assets/CameraAssets/ActionCamera/Player/Dash/SmoothAssets/Default.smooth'),d=await store.ensure(a.path),parts=['Channels','Dist','ResponseCurve'],sourcePath=JSON.parse(d.text).Channels.Dist.ResponseCurve;
+  const a=snap.assets.find(a=>a.path==='Assets/CameraAssets/ActionCamera/Player/Dash/SmoothAssets/Dash_Default.smooth'),d=await store.ensure(a.path),parts=['Channels','Dist','ResponseCurve'],sourcePath=JSON.parse(d.text).Channels.Dist.ResponseCurve;
   const sources=await Promise.all(['Assets/CurveAssets/Bezier/Linear.curve',sourcePath].map(file=>p.read(file)));
   store.editField({path:d.path,parts,value:'Assets/CurveAssets/Bezier/Linear.curve',baseValue:sourcePath});await store.save({paths:[d.path],versions:{[d.path]:d.version}});
   assert.equal(JSON.parse((await p.read(d.path)).text).Channels.Dist.ResponseCurve,'Assets/CurveAssets/Bezier/Linear.curve');for(const old of sources)assert.equal((await p.read(old.path)).text,old.text);
@@ -36,7 +36,7 @@ test('new curve collision and unsupported types leave files unchanged',async()=>
   assert.equal((await p.snapshot()).snapshotRevision,current.snapshotRevision);
 });
 test('shared field patches merge different-window edits and reject stale same-field writes',async()=>{
-  const a=snap.assets.find(a=>a.path.endsWith('/Dash/InputAssets/User.input')),d=await store.ensure(a.path),before=JSON.parse(d.text);
+  const a=snap.assets.find(a=>a.path.endsWith('/Dash/InputAssets/Dash_User.input')),d=await store.ensure(a.path),before=JSON.parse(d.text);
   const first=['Channels','Yaw','Weight'],second=['Channels','Pitch','Weight'];
   store.editField({path:d.path,parts:first,value:-2,baseValue:before.Channels.Yaw.Weight});
   store.editField({path:d.path,parts:second,value:-3,baseValue:before.Channels.Pitch.Weight});

@@ -19,12 +19,17 @@ if not defined EDITOR_VERSION goto missing_files
 if not exist "node_modules\.bin\vite.cmd" goto install_dependencies
 if not exist "node_modules\.bin\tsc.cmd" goto install_dependencies
 if not exist "node_modules\.bin\electron-builder.cmd" goto install_dependencies
-if not exist "node_modules\electron\dist\electron.exe" goto install_dependencies
-goto build
+if not exist "node_modules\electron\install.js" goto install_dependencies
+goto prepare_electron
 :install_dependencies
 echo Installing locked dependencies. The first build may need internet access.
 call npm.cmd ci --prefer-offline --no-audit --no-fund
 if errorlevel 1 goto failed
+:prepare_electron
+echo Preparing the Electron runtime. The first download may need internet access.
+call npm.cmd run electron:install
+if errorlevel 1 goto failed
+if not exist "node_modules\electron\dist\electron.exe" goto missing_electron
 :build
 echo [2/3] Compiling editor...
 call npm.cmd run build
@@ -43,6 +48,9 @@ echo ERROR: Install Node.js 22.12 or newer, then reopen this script.
 goto done
 :missing_files
 echo ERROR: Required project files are missing. Keep this script in the editor root folder.
+goto done
+:missing_electron
+echo ERROR: Electron runtime is missing after installation. Check the download output above.
 goto done
 :failed
 echo.

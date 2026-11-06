@@ -19,12 +19,12 @@ test('paused simulation freezes time, resume continues and stop resets to initia
   const sim=new Simulation();try{await sim.start(project,{}, {rigPath:'Assets/CameraAssets/ActionCamera/Player/Run/Run.rig'});await new Promise(r=>setTimeout(r,150));await sim.pause();const time=sim.frame.time;assert.ok(time>0);await new Promise(r=>setTimeout(r,120));assert.equal(sim.frame.time,time);sim.resume();await new Promise(r=>setTimeout(r,100));await sim.pause();assert.ok(sim.frame.time>time);sim.stop();assert.equal(sim.frame.time,0);assert.equal(sim.process,null);assert.equal(sim.status,'stopped');}finally{sim.stop();}
 });
 test('current asset drafts are used and remain frozen throughout a run',async()=>{
-  const input=snapshot.assets.find(a=>a.path==='Assets/CameraAssets/InteractiveCamera/Player/Dialogue/InputAssets/Enter.input');const target=snapshot.assets.find(a=>a.path===input.data.ValueAssets[0].Path);
+  const input=snapshot.assets.find(a=>a.path==='Assets/CameraAssets/InteractiveCamera/Player/Dialogue/InputAssets/Dialogue_Enter.input');const target=snapshot.assets.find(a=>a.path===input.data.ValueAssets[0].Path);
   const data=structuredClone(target.data);data.Channels.Dist.Value=280;const drafts={[target.path]:encode(data)};const sim=new Simulation();
   try{await sim.start(project,drafts,{rigPath:'Assets/CameraAssets/InteractiveCamera/Player/Dialogue/Dialogue.rig'},false);await sim.step(90);assert.equal(sim.frame.target.Dist,280);data.Channels.Dist.Value=350;drafts[target.path]=encode(data);await sim.step(15);assert.equal(sim.frame.target.Dist,280);await sim.start(project,drafts,{rigPath:'Assets/CameraAssets/InteractiveCamera/Player/Dialogue/Dialogue.rig'},false);await sim.step(90);assert.equal(sim.frame.target.Dist,350);assert.equal(JSON.parse((await project.read(target.path)).text).Channels.Dist.Value,target.data.Channels.Dist.Value);}finally{sim.stop();}
 });
 test('explicit interactive ID resolves the selected target and unknown IDs fail without a running child',async()=>{
-  const input=snapshot.assets.find(a=>a.path==='Assets/CameraAssets/InteractiveCamera/Player/Dialogue/InputAssets/Enter.input');const target=snapshot.assets.find(a=>a.path===input.data.ValueAssets[1].Path);const data=structuredClone(target.data);data.Channels.Dist.Value=320;
+  const input=snapshot.assets.find(a=>a.path==='Assets/CameraAssets/InteractiveCamera/Player/Dialogue/InputAssets/Dialogue_Enter.input');const target=snapshot.assets.find(a=>a.path===input.data.ValueAssets[1].Path);const data=structuredClone(target.data);data.Channels.Dist.Value=320;
   const sim=new Simulation();try{await sim.start(project,{[target.path]:encode(data)},{rigPath:'Assets/CameraAssets/InteractiveCamera/Player/Dialogue/Dialogue.rig',id:10002},false);await sim.step(120);assert.equal(sim.frame.target.Dist,320);await assert.rejects(()=>sim.start(project,{}, {rigPath:'Assets/CameraAssets/InteractiveCamera/Player/Dialogue/Dialogue.rig',id:99999},false),/Id/);assert.equal(sim.status,'error');assert.equal(sim.process,null);}finally{sim.stop();}
 });
 test('battle and idle spaces use real pipelines and invalid drafts prevent playback',async()=>{
@@ -33,14 +33,14 @@ test('battle and idle spaces use real pipelines and invalid drafts prevent playb
 test('stopping while preparing cancels activation and leaves no timer or child',async()=>{const sim=new Simulation();const pending=sim.start(project,{}, {rigPath:'Assets/CameraAssets/ActionCamera/Player/Dash/Dash.rig'});sim.stop();await pending;assert.equal(sim.status,'stopped');assert.equal(sim.process,null);});
 
 test('preview collision drives the real occlusion stage while respecting configured minimum distance',async()=>{
-  const range=snapshot.assets.find(a=>a.path==='Assets/CameraAssets/IdleCamera/Player/Default/RangeAssets/Default.range'),data=structuredClone(range.data);data.Channels.Dist.Min=100;const sim=new Simulation();try{
+  const range=snapshot.assets.find(a=>a.path==='Assets/CameraAssets/IdleCamera/Player/Default/RangeAssets/Default_Default.range'),data=structuredClone(range.data);data.Channels.Dist.Min=100;const sim=new Simulation();try{
     await sim.start(project,{[range.path]:encode(data)},{rigPath:'Assets/CameraAssets/IdleCamera/Player/Default/Default.rig',obstacle:true},false);await sim.step(120);assert.ok(Math.abs(sim.frame.target.Dist-130)<.01);assert.ok(sim.frame.output.Dist>=100);assert.ok(sim.frame.output.Dist<140);
     data.Channels.Dist.Min=200;await sim.start(project,{[range.path]:encode(data)},{rigPath:'Assets/CameraAssets/IdleCamera/Player/Default/Default.rig',obstacle:true},false);await sim.step(120);assert.equal(sim.frame.target.Dist,200);
   }finally{sim.stop();}
 });
 
 test('effect preview calls project business methods and reports missing or nonnumeric interfaces',async()=>{
-  const rig=snapshot.assets.find(a=>a.path.endsWith('/Run/Run.rig')),effect=snapshot.assets.find(a=>a.path.endsWith('/EffectAssets/MovementSpeed.effect'));
+  const rig=snapshot.assets.find(a=>a.path.endsWith('/Run/Run.rig')),effect=snapshot.assets.find(a=>a.path.endsWith('/EffectAssets/Run_MovementSpeed.effect'));
   const data=structuredClone(rig.data);data.Processors.Effects=[effect.path];
   const sim=new Simulation();try {
     await sim.start(project,{[rig.path]:encode(data)},{rigPath:rig.path,speed:2400},false);await sim.step(100);const boosted=sim.frame.target.FOV;

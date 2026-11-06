@@ -3,7 +3,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { validateRuntime } = require('./validation.cjs');
 const extensions = {Rig:'.rig', Pipeline:'.pipeline', Input:'.input', Effect:'.effect', Range:'.range', Sensitivity:'.sensitivity', Occlusion:'.occlusion', Smooth:'.smooth', Curve:'.curve', Value:'.value'};
-const versions = {Rig:13, Pipeline:2, Effect:6, Range:5, Sensitivity:2, Occlusion:4, Smooth:2, Curve:3, Value:2};
+const versions = {Rig:14, Pipeline:2, Effect:6, Range:5, Sensitivity:2, Occlusion:4, Smooth:2, Curve:3, Value:2};
 const hash = text => crypto.createHash('sha256').update(text).digest('hex');
 const json = text => JSON.parse(text.replace(/^\uFEFF/, ''));
 const encode = data => JSON.stringify(data, null, 2) + '\n';
@@ -23,8 +23,7 @@ function references(value, parts = [], found = []) {
     else if(key==='RangeAsset')type='Range';
     else if(key==='Path'&&/^ValueAssets\.\d+$/.test(parent))type='Value';
     else if(Array.isArray(value)) {
-      type=({Ranges:'Range',Pipelines:'Pipeline','Processors.Effects':'Effect','Processors.Smooth':'Smooth','Processors.Occlusion':'Occlusion','Processors.Input.SensitivityAssets':'Sensitivity','Processors.Input.Transitions':'Input'})[parent];
-      if(parent.startsWith('Processors.Input.Channels.'))type='Input';
+      type=({Ranges:'Range',Pipelines:'Pipeline','Processors.Effects':'Effect','Processors.Smooth':'Smooth','Processors.Occlusion':'Occlusion','Processors.Input.SensitivityAssets':'Sensitivity','Processors.Input.Assets':'Input'})[parent];
     }
     if(type&&typeof v==='string')found.push({path:v,field,type,parts:next});
     else if(v&&typeof v==='object')references(v,next,found);
@@ -92,7 +91,7 @@ class Project {
         asset.revision=hash(text);asset.data=json(text);
         if(!asset.data||typeof asset.data!=='object'||Array.isArray(asset.data))throw Error('资产必须为 JSON 对象');
         if(Object.hasOwn(asset.data,'Id'))throw Error('新版资产不保存根 Id，请使用相对 CameraFramework 的路径');
-        const expected=type==='Input'?(asset.data.Type==='Transition'?4:2):versions[type];
+        const expected=type==='Input'?(asset.data.Type==='Transition'?4:3):versions[type];
         if(asset.data.SchemaVersion!==expected)throw Error(`不支持的资产版本，当前要求 ${expected}；旧结构不能仅修改版本号`);
         asset.refs=references(asset.data);
       }catch(e){issues.push({path:f.path,field:'',message:e.message,severity:'error'});}
@@ -149,6 +148,15 @@ class Project {
   mutate(request){return this.serial(async()=>{
     const snap=await this.snapshot();
     if(request.snapshotRevision!==snap.snapshotRevision)throw Error('资产文件已变化，请刷新后重试');
+    if(request.kind==='create-directory') {
+      const relative=cleanRelative(request.path);
+      if(!relative.startsWith('Assets/'))throw Error('新文件夹必须位于 Assets 内');
+      const parent=await this.resolve(path.posix.dirname(relative));
+      if(!(await fs.stat(parent)).isDirectory())throw Error('父目录不存在');
+      const destination=await this.resolve(relative,true);
+      try {await fs.mkdir(destination);} catch(e) {if(e.code==='EEXIST')throw Error('同名文件或文件夹已存在');throw e;}
+      return {directory:relative};
+    }
     const entries=[];
     const source=snap.assets.find(a=>a.path===request.sourcePath);
     let destination;

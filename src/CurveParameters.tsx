@@ -1,4 +1,5 @@
-export default function CurveParameters({data,onChange,prefix='曲线'}:any){
+import {t,tt} from './i18n';
+export default function CurveParameters({data,onChange,prefix=t('曲线')}:any){
   const bezier=data.ParentType==='Bezier';const entries=bezier?['P1','P2','P3','P4'].filter(k=>data[k]).map(k=>[k,data[k]]):(data.Points||[]).map((p:any,i:number)=>[String(i),p]);
-  return <div className="curve-parameters">{entries.map(([key,p]:any)=><div className="curve-param-row" key={key}><b>{bezier?key:`节点 ${Number(key)+1}`}</b>{(bezier?['X','Y']:['X','Y','Tangent']).map(axis=><label key={axis}>{axis}<input type="number" step="any" aria-label={`${prefix}.${bezier?key:'Points.'+key}.${axis}`} value={p[axis]??0} onChange={e=>{const n=Number(e.target.value);if(!e.target.value.trim()||!Number.isFinite(n))return;const next=structuredClone(data);(bezier?next[key]:next.Points[Number(key)])[axis]=n;onChange(next);}}/></label>)}</div>)}</div>;
+  return <div className="curve-parameters">{entries.map(([key,p]:any)=><div className="curve-param-row" key={key}><b>{bezier?key:tt`节点 ${Number(key)+1}`}</b>{(bezier?['X','Y']:['X','Y','Tangent']).map(axis=><label key={axis}>{axis}<input type="number" step="any" aria-label={`${prefix}.${bezier?key:'Points.'+key}.${axis}`} value={p[axis]??0} onChange={e=>{const n=Number(e.target.value);if(!e.target.value.trim()||!Number.isFinite(n))return;const next=structuredClone(data);(bezier?next[key]:next.Points[Number(key)])[axis]=n;onChange(next);}}/></label>)}</div>)}</div>;
 }
