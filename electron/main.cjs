@@ -71,12 +71,32 @@ app.whenReady().then(()=>{
   handle('select-tab',(meta,p)=>{const tab=meta.tabs?.find(t=>t.path===p);if(!tab)throw Error('标签不存在');meta.file=p;meta.contextRig=tab.contextRig;emitTabs(meta);});handle('close-tab',closeTab);
   handle('context',(_m,id)=>{
     const sequence=++contextSequence,current=project,docs=documents;
-    contextTask=(async()=>{const snap=await current.snapshot();const asset=snap.assets.find(a=>a.id===id&&a.type==='Rig');if(!asset)throw Error('装置不存在');await docs.ensure(asset.path);if(sequence===contextSequence&&current===project){if(contextRig!==id)simulation.reset();contextRig=id;send(main,'context',id);}return docs.state();})();return contextTask;
+    contextTask=(async()=>{const snap=await current.snapshot();const asset=snap.assets.find(a=>a.path===id&&a.type==='Rig');if(!asset)throw Error('装置不存在');await docs.ensure(asset.path);if(sequence===contextSequence&&current===project){if(contextRig!==id)simulation.reset();contextRig=id;send(main,'context',id);}return docs.state();})();return contextTask;
   });
   handle('edit-text',(_m,r)=>documents.editText(r));handle('edit-field',(_m,r)=>documents.editField(r));handle('history',(_m,p,redo)=>documents.history(p,redo));handle('reload',(_m,p)=>documents.reload(p));handle('discard',(_m,p)=>documents.discard(p));
   handle('save-session',async(_m,r)=>{const result=await documents.save(r);await refresh();return result;});
-  handle('mutate',async(_m,request)=>{if(documents.busy||(dirty()&&!['copy','create-curve'].includes(request.kind)))throw Error('请先保存或丢弃全部草稿，再移动、删除或登记资产');const snap=await project.snapshot();const source=snap.assets.find(a=>a.id===request.sourceId);documents.busy=true;publish(documents.state());let result;try{result=await project.mutate(request);if(source&&['move','delete'].includes(request.kind)){documents.docs.delete(source.path);for(const item of windows.values())if(item.kind==='editor'){item.tabs=item.tabs.filter(t=>t.path!==source.path);if(item.file===source.path){item.file=item.tabs[0]?.path||'';item.contextRig=item.tabs[0]?.contextRig||'';}emitTabs(item);}}}finally{documents.busy=false;publish(documents.state());}await refresh();return result;});
-  handle('simulation',async(meta,command,options)=>{if(meta.kind==='editor')throw Error('请在主工作区控制模拟');if(command==='start'){await contextTask;if(!project||documents.busy)throw Error('项目尚未准备好');const drafts=Object.fromEntries(documents.state().docs.filter(d=>d.dirty).map(d=>[d.path,d.text]));return simulation.start(project,drafts,{...options,rigId:contextRig});}if(command==='pause')return simulation.pause();if(command==='resume')return simulation.resume();if(command==='stop')return simulation.stop();throw Error('未知模拟命令');});
+  handle('mutate',async(_m,request)=>{
+    if(documents.busy||(dirty()&&!['copy','create-curve'].includes(request.kind)))throw Error('请先保存或丢弃全部草稿，再移动或删除资产');
+    const snap=await project.snapshot(),source=snap.assets.find(a=>a.path===request.sourcePath);
+    documents.busy=true;publish(documents.state());let result;
+    try {
+      result=await project.mutate(request);
+      if(source&&['move','delete'].includes(request.kind)) {
+        documents.docs.delete(source.path);simulation.reset();
+        if(contextRig===source.path){++contextSequence;contextRig=result.path||'';if(contextRig)await documents.ensure(contextRig);send(main,'context',contextRig);}
+        for(const item of windows.values())if(item.kind==='editor') {
+          if(result.path)item.tabs=item.tabs.map(t=>({...t,path:t.path===source.path?result.path:t.path,contextRig:t.contextRig===source.path?result.path:t.contextRig}));
+          else item.tabs=item.tabs.filter(t=>t.path!==source.path);
+          if(item.file===source.path)item.file=result.path||item.tabs[0]?.path||'';
+          if(item.contextRig===source.path)item.contextRig=result.path||'';
+          if(result.path&&item.tabs.some(t=>t.path===result.path))await documents.ensure(result.path);
+          emitTabs(item);
+        }
+      }
+    }finally{documents.busy=false;publish(documents.state());}
+    await refresh();return result;
+  });
+  handle('simulation',async(meta,command,options)=>{if(meta.kind==='editor')throw Error('请在主工作区控制模拟');if(command==='start'){await contextTask;if(!project||documents.busy)throw Error('项目尚未准备好');const drafts=Object.fromEntries(documents.state().docs.filter(d=>d.dirty).map(d=>[d.path,d.text]));return simulation.start(project,drafts,{...options,rigPath:contextRig});}if(command==='pause')return simulation.pause();if(command==='resume')return simulation.resume();if(command==='stop')return simulation.stop();throw Error('未知模拟命令');});
   handle('validate',async()=>{const drafts=Object.fromEntries(documents.state().docs.filter(d=>d.text!==d.saved).map(d=>[d.path,d.text]));return project.serial(()=>project.validate(drafts));});
   handle('reveal',async(_m,relative)=>{if(!project)throw Error('请先打开框架');const full=await project.resolve(relative);if(!(await fs.stat(full)).isFile())throw Error('请选择文件');if(main.isMinimized())main.restore();main.show();send(main,'locate',relative);main.focus();});handle('recovery',()=>shell.openPath(path.join(app.getPath('userData'),'recovery')));handle('preferences',async(_m,patch)=>{const s=await settings();if(patch.layout)s.layout=patch.layout;await writeSettings(s);});
   const command=cmd=>()=>{const win=BrowserWindow.getFocusedWindow()||main;if(cmd==='open'){main.focus();send(main,'command',cmd);}else send(win,'command',cmd);};

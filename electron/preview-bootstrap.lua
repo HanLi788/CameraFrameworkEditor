@@ -26,4 +26,4 @@ table.insert(package.searchers,1,function(name)
     return '\n\tModule not supplied: '..name
 end)
 package.loaded['Foundation.Serialization.JsonReader']=Json
-package.loaded['CameraFramework.AssetLoading.AssetPaths']={GetRootDirectory=function() return '__editor__/Assets' end}
+package.loaded['CameraFramework.AssetLoading.AssetPaths']={GetRootDirectory=function() return '__editor__' end}

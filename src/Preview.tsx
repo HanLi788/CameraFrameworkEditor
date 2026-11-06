@@ -7,7 +7,7 @@ const channelNames=['AnchorLocOffset.X','AnchorLocOffset.Y','AnchorLocOffset.Z',
 const phaseNames:any={Idle:'闲置',Entering:'进入',Holding:'停留',Exiting:'退出'};
 const vec=(v:any)=>new THREE.Vector3(v.X/100,v.Z/100,v.Y/100);
 function initialFrame(assets:Asset[]){
-  const d=assets.find(a=>a.id==='Rig.IdleCamera.Default')?.data?.Defaults;if(!d)return null;
+  const d=assets.find(a=>a.path==='Assets/CameraAssets/IdleCamera/Player/Default/Default.rig')?.data?.Defaults;if(!d)return null;
   const values:any={...d,'AnchorLocOffset.X':d.AnchorLocOffset[0],'AnchorLocOffset.Y':d.AnchorLocOffset[1],'AnchorLocOffset.Z':d.AnchorLocOffset[2]};delete values.AnchorLocOffset;
   const p=THREE.MathUtils.degToRad(d.Pitch),y=THREE.MathUtils.degToRad(d.Yaw),r=THREE.MathUtils.degToRad(d.Roll);
   const forward={X:Math.cos(p)*Math.cos(y),Y:Math.cos(p)*Math.sin(y),Z:Math.sin(p)};
@@ -18,9 +18,9 @@ export default function Preview({rig,assets,simulation,onCommand,disabled}:{disa
   const mount=useRef<HTMLDivElement>(null),sceneRef=useRef<any>(null),latest=useRef<any>(null);
   const [view,setView]=useState('camera'),[error,setError]=useState(''),[channels,setChannels]=useState(false),[speed,setSpeed]=useState(0),[obstacle,setObstacle]=useState(false),[selected,setSelected]=useState('');
   const status=simulation?.status||'stopped';const frame=simulation?.frame||initialFrame(assets);latest.current={frame,view};
-  const transition=useMemo(()=>{const ids:any[]=[];const walk=(v:any)=>{if(!v||typeof v!=='object')return;if(v.Phase==='Enter'&&v.AssetId)ids.push(v.AssetId);for(const x of Object.values(v))if(x&&typeof x==='object')walk(x);};walk(rig?.data?.Processors?.Input);return assets.find(a=>a.id===ids[0]);},[rig,assets]);
+  const transition=useMemo(()=>assets.find(a=>rig?.data?.Processors?.Input?.Transitions?.includes(a.path)&&a.data?.Phase==='Enter'),[rig,assets]);
   const slots=transition?.data?.ValueAssets||[];
-  useEffect(()=>setSelected(''),[rig?.id]);
+  useEffect(()=>setSelected(''),[rig?.path]);
   const options=()=>({speed,obstacle,...(selected&&slots[Number(selected)]?.Id!==undefined?{id:slots[Number(selected)].Id}:{})});
   useEffect(()=>{
     const el=mount.current;if(!el)return;let renderer:THREE.WebGLRenderer;

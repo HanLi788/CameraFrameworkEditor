@@ -33,7 +33,7 @@ package.loaded['Foundation.Adaptation.UEMath']={GetForwardVector=function(r)
 end}
 package.loaded['Foundation.Adaptation.SluaAPI']={}
 package.loaded['CameraFramework.Adaptation.UECamera']={}
-package.loaded['CameraFramework.AssetLoading.AssetPaths']={GetRootDirectory=function() return '__editor__/Assets' end}
+package.loaded['CameraFramework.AssetLoading.AssetPaths']={GetRootDirectory=function() return '__editor__' end}
 local function quote(s)
     return '"'..tostring(s):gsub('[%z\1-\31\\"]',function(c)
         local m={['"']='\\"',['\\']='\\\\',['\n']='\\n',['\r']='\\r',['\t']='\\t'}
@@ -42,24 +42,22 @@ local function quote(s)
 end
 local issues={};local checked=0
 local ok,err=pcall(function()
-    local catalog=require('CameraFramework.AssetLoading.AssetCatalog').GetDefault()
     local map={Value='Values',Range='Ranges',Smooth='Smoothing',Sensitivity='Sensitivity',Input='Inputs',Effect='Effects',Occlusion='Occlusion',Pipeline='Pipeline'}
-    local ids={};for id in pairs(catalog.Entries) do ids[#ids+1]=id end;table.sort(ids)
-    for _,id in ipairs(ids) do
-        local entry=catalog.Entries[id]
+    for _,entry in ipairs(bundle.assets) do
+        local file=entry.path
         local valid,message=pcall(function()
-            if entry.Type=='Curve' then require('CameraFramework.Curves.CurveLibrary').GetDefault():Resolve(id)
-            elseif entry.Type=='Rig' then
-                local raw=Json.Decode(bundle.files['__editor__/Assets/'..entry.Path])
-                local pipeline=require('CameraFramework.Pipeline.AssetLibrary').GetDefault():Get(raw.PipelineAssetId)
+            if entry.type=='Curve' then require('CameraFramework.Curves.CurveLibrary').GetDefault():Resolve(file)
+            elseif entry.type=='Rig' then
+                local raw=Json.Decode(bundle.files['__editor__/'..file])
+                local pipeline=require('CameraFramework.Pipeline.AssetLibrary').GetDefault():Get(assert(raw.Pipelines[1],'装置缺少管线'))
                 local space=assert(({Action='ActionCamera',Idle='IdleCamera',Battle='BattleCamera',Interactive='InteractiveCamera'})[pipeline.SpaceType],'Unknown space type')
                 local prefix='CameraFramework.CameraSpaces.'..space
                 local validator=require(prefix..(space=='IdleCamera' and '.Definition.Validator' or '.Rig.Definition.Validator'))
-                require('CameraFramework.AssetLoading.DefinitionLoader').Load('__editor__/Assets/'..entry.Path,validator.Validate,require(prefix..'.PipelineRules').Environment(),id)
-            else require('CameraFramework.'..assert(map[entry.Type])..'.AssetLibrary').GetDefault():Get(id) end
+                require('CameraFramework.AssetLoading.DefinitionLoader').Load('__editor__/'..file,validator.Validate,require(prefix..'.PipelineRules').Environment(),file)
+            else require('CameraFramework.'..assert(map[entry.type])..'.AssetLibrary').GetDefault():Get(file) end
         end)
-        if valid then checked=checked+1 else issues[#issues+1]='{"path":'..quote('Assets/'..entry.Path)..',"severity":"error","message":'..quote(message)..'}' end
+        if valid then checked=checked+1 else issues[#issues+1]='{"path":'..quote(file)..',"severity":"error","message":'..quote(message)..'}' end
     end
 end)
-if not ok then issues[#issues+1]='{"path":"Assets/Index.json","severity":"error","message":'..quote(err)..'}' end
+if not ok then issues[#issues+1]='{"path":"","severity":"error","message":'..quote(err)..'}' end
 io.write('EDITOR_RESULT:{"checked":'..checked..',"issues":['..table.concat(issues,',')..']}\n')

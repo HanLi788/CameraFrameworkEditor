@@ -6,7 +6,7 @@ local Dispatcher=require('Foundation.Event.Dispatcher.EventDispatcher')
 local Manager=require('CameraFramework.CameraSpaceManager')
 local Channels=require('CameraFramework.Core.InputChannels')
 local options=bundle.options
-local pipeline=require('CameraFramework.Pipeline.AssetLibrary').GetDefault():Get(options.pipelineId)
+local pipeline=require('CameraFramework.Pipeline.AssetLibrary').GetDefault():Get(options.pipelinePath)
 local space=pipeline.SpaceType
 local dispatcher=Dispatcher.New()
 local started,ended=Event.New('Preview.Start',Rule.BROADCAST),Event.New('Preview.End',Rule.BROADCAST)
@@ -32,27 +32,25 @@ local target=Adapters.UETool.SpawnActor(world,nil,Vector.New(250,0,88))
 target.Capsule={Location=target.Location,Radius=34,HalfHeight=88}
 world.Obstacles[1]={Enabled=options.obstacle==true,Location=Vector.New(-180,0,100),HalfSize=Vector.New(35,80,100),Materials={}}
 
--- 注册接口仍由真实空间管理器处理；宿主将预览名称解析为所选稳定资产 Id。
-if space~='Idle' then
-    local names={Action='ActionCamera',Interactive='InteractiveCamera',Battle='BattleCamera'}
-    local loader=require('CameraFramework.CameraSpaces.'..assert(names[space],'不支持的相机空间')..'.Rig.Definition.Loader')
-    loader.LoadNamed=function(ownerName,rigName,environment)
-        assert(ownerName=='Editor' and rigName=='Preview','预览只注册所选装置')
-        return loader.LoadAsset(options.rigId,environment)
-    end
-elseif options.rigId~='Rig.IdleCamera.Default' then
+-- 预览角色可提供项目业务侧的只读移动查询；不在框架内登记效果来源。
+if bundle.modules['Actor.Player.MovementValues'] then
+    local values=require('Actor.Player.MovementValues')
+    for name,fn in pairs(values) do if type(fn)=='function' then owner[name]=fn end end
+end
+-- 闲置没有注册装置入口，按选中的文件替换本次模拟的闲置加载入口。
+if space=='Idle' then
     local loader=require('CameraFramework.CameraSpaces.IdleCamera.Definition.Loader')
     loader.Load=function(environment)
         return require('CameraFramework.AssetLoading.DefinitionLoader').Load(
-            require('CameraFramework.AssetLoading.AssetCatalog').ResolvePath('Rig',options.rigId),
-            require('CameraFramework.CameraSpaces.IdleCamera.Definition.Validator').Validate,environment,options.rigId)
+            require('CameraFramework.AssetLoading.PathLibrary').Resolve('Rig',options.rigPath),
+            require('CameraFramework.CameraSpaces.IdleCamera.Definition.Validator').Validate,environment,options.rigPath)
     end
 end
 local rig
 local manager=Manager.New():Setup(owner,function(m)
-    if space=='Action' then rig=m:AddActionRig('Editor','Preview',{started},{ended})
-    elseif space=='Interactive' then rig=m:AddInteractiveRig('Editor','Preview',{started},{ended})
-    elseif space=='Battle' then rig=m:AddBattleRig('Editor','Preview',{started},{},{ended}) end
+    if space=='Action' then rig=m:AddActionRig(options.rigPath,'Preview',{started},{ended})
+    elseif space=='Interactive' then rig=m:AddInteractiveRig(options.rigPath,'Preview',{started},{ended})
+    elseif space=='Battle' then rig=m:AddBattleRig(options.rigPath,'Preview',{started},{},{ended}) end
 end)
 if space=='Interactive' then require('CameraFramework.CameraSpaces.InteractiveCamera.Rig.Definition.TargetValues').RequireId(rig.Config,options.id) end
 local phase,time,hold='Idle',0,0
@@ -76,7 +74,7 @@ local function sample()
     local current=manager.ActiveCameraSpace or manager:GetCameraSpace('Idle')
     local output=manager.Output.FinalState
     local rot=output.CameraRot
-    return {phase=phase,time=time,hold=hold,rigId=options.rigId,space=space,
+    return {phase=phase,time=time,hold=hold,rigPath=options.rigPath,space=space,
         target=channelValues(current.CameraContext.TargetFrameState),render=channelValues(current.CameraContext.RenderFrameState),
         output=channelValues(output),location=vector(output.CameraLoc),
         forward=vector(Adapters.UEMath.GetForwardVector(rot)),up=vector(Adapters.UEMath.GetUpVector(rot)),

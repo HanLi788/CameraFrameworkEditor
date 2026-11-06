@@ -9,5 +9,5 @@ window.MonacoEnvironment={getWorker:(_id:string,label:string)=>label==='json'?ne
 loader.config({monaco});
 export default function TextEditor({doc,onChange,onReady}:{doc:any;onChange:(text:string)=>void;onReady:(editor:any)=>void}){
   const language=doc.path.endsWith('.lua')?'lua':/\.md$/i.test(doc.path)?'markdown':/\.(json|value|rig|input|curve|range|smooth|sensitivity|occlusion|effect|pipeline)$/.test(doc.path)?'json':'plaintext';
-  return <Editor path={doc.path} value={doc.text} language={language} theme="vs-dark" onMount={onReady} onChange={v=>onChange(v??'')} options={{readOnly:doc.path==='Assets/Index.json',fontSize:13,fontFamily:'Cascadia Code, Consolas, monospace',minimap:{enabled:false},automaticLayout:true,scrollBeyondLastLine:false,tabSize:2,wordWrap:'on',padding:{top:18},renderLineHighlight:'line'}}/>;
+  return <Editor path={doc.path} value={doc.text} language={language} theme="vs-dark" onMount={onReady} onChange={v=>onChange(v??'')} options={{fontSize:13,fontFamily:'Cascadia Code, Consolas, monospace',minimap:{enabled:false},automaticLayout:true,scrollBeyondLastLine:false,tabSize:2,wordWrap:'on',padding:{top:18},renderLineHighlight:'line'}}/>;
 }

@@ -1,17 +1,19 @@
 const fs=require('node:fs/promises'),path=require('node:path'),{spawn}=require('node:child_process');
 async function bundleProject(project,overrides,options){
-  const snapshot=await project.snapshot(overrides),modules={},files={'__editor__/Assets/Index.json':overrides['Assets/Index.json']??(await project.read('Assets/Index.json')).text};
+  const snapshot=await project.snapshot(overrides),modules={},files={};
   for(const a of snapshot.assets)files['__editor__/'+a.path]=overrides[a.path]??(await project.read(a.path)).text;
   const frozen=Object.fromEntries(Object.entries(files).map(([key,value])=>[key.slice('__editor__/'.length),value]));
   const check=await project.validate(frozen);const errors=check.issues.filter(i=>i.severity==='error');
   if(!check.runtime||errors.length)throw Error('模拟配置校验失败：\n'+errors.map(e=>e.message).join('\n'));
-  const asset=snapshot.assets.find(a=>a.id===options.rigId&&a.type==='Rig');if(!asset)throw Error('请选择有效装置');
+  const asset=snapshot.assets.find(a=>a.path===options.rigPath&&a.type==='Rig');if(!asset)throw Error('请选择有效装置');
   async function walk(dir,prefix,relative=''){for(const f of await fs.readdir(dir,{withFileTypes:true})){
     if(f.isSymbolicLink()||f.name==='Test')continue;const name=prefix+'.'+f.name,rel=relative?relative+'/'+f.name:f.name;
     if(f.isDirectory())await walk(path.join(dir,f.name),name,rel);else if(f.name.endsWith('.lua'))modules[name.slice(0,-4)]=prefix.startsWith('CameraFramework')&&overrides[rel]!==undefined?overrides[rel]:await fs.readFile(path.join(dir,f.name),'utf8');
   }}
   await walk(project.root,'CameraFramework');await walk(path.join(path.dirname(project.root),'Foundation'),'Foundation');
-  const payload=JSON.stringify({modules,files,options:{...options,pipelineId:asset.data.PipelineAssetId}});let delimiter='====';while(payload.includes(']'+delimiter+']'))delimiter+='=';
+  const movement=path.join(path.dirname(project.root),'Actor','Player','MovementValues.lua');
+  if(await fs.stat(movement).catch(()=>null))modules['Actor.Player.MovementValues']=await fs.readFile(movement,'utf8');
+  const payload=JSON.stringify({modules,files,options:{...options,pipelinePath:asset.data.Pipelines[0]}});let delimiter='====';while(payload.includes(']'+delimiter+']'))delimiter+='=';
   const scripts=await Promise.all(['preview-bootstrap.lua','preview-adapters.lua','preview-runtime.lua'].map(f=>fs.readFile(path.join(__dirname,f),'utf8')));
   return `local bundleText=[${delimiter}[${payload}]${delimiter}]\n`+scripts[0]+`\nlocal Adapters=(function()\n${scripts[1]}\nend)()\n`+scripts[2];
 }
