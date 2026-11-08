@@ -5,6 +5,19 @@ const {Documents}=require('./documents.cjs');
 const {Simulation}=require('./simulation.cjs');
 const {getWorld}=require('./world-service.cjs');
 const {GameWorlds}=require('./game-worlds.cjs');
+const {LiveDebug}=require('./live-debug.cjs');
+const {randomUUID}=require('node:crypto');
+let liveDebug;
+const debugFlushes=new Map();
+async function flushDebugEditors(){
+  const id=randomUUID(),targets=[...windows.values()].filter(m=>m.kind==='main'||m.kind==='postprocessing');
+  await Promise.all(targets.map(meta=>new Promise((resolve,reject)=>{
+    const key=id+':'+meta.win.webContents.id;
+    const timer=setTimeout(()=>{debugFlushes.delete(key);reject(Error('等待编辑窗口提交参数超时'));},10000);
+    debugFlushes.set(key,{finish:error=>{clearTimeout(timer);debugFlushes.delete(key);error?reject(Error(error)):resolve();}});
+    send(meta.win,'flush-live-debug',id);
+  })));
+}
 app.setName('CameraFrameworkEditor');
 if(process.env.CAMERA_EDITOR_TEST_DATA)app.setPath('userData',process.env.CAMERA_EDITOR_TEST_DATA);
 let game,games,closingGame,activeWorldId,lastGrounded,checkpointTimer;
@@ -26,16 +39,19 @@ function publish(state){for(const meta of windows.values())if(meta.kind==='main'
 async function refresh(){if(!project||documents.busy)return;if(refreshing)return refreshing;const current=project;refreshing=(async()=>{const snap=await current.snapshot();if(current!==project)return;await documents.refresh();broadcast('project',snap);return snap;})().finally(()=>refreshing=null);return refreshing;}
 function dirty(){return documents?.state().docs.some(d=>d.dirty);}
 async function openProject(root){
-  if(dirty()||documents?.busy)throw Error('请先保存或丢弃全部窗口的草稿，再切换框架');
+  if(dirty()||documents?.busy||liveDebug?.busy)throw Error('请先完成保存或丢弃全部窗口的草稿，再切换框架');
   const next=await Project.open(root,app.getPath('userData'),runtime());const snapshot=await next.snapshot();
   if(await closeGame()===false)throw Error('已取消切换工作区');
   for(const meta of [...windows.values()])if(meta.kind==='postprocessing')meta.win.destroy();
   games=await new GameWorlds(app.getPath('userData'),next.root,snapshot.effectCatalog.postProcessing||[]).load();
   const mainMeta=windows.get(main.webContents.id);mainMeta.tabs=[];mainMeta.file='';mainMeta.contextRig='';mainMeta.workspaceRig='';mainMeta.canvasRig='';mainMeta.detailOpen=false;mainMeta.detailHistory=[];mainMeta.rigSelections={};mainMeta.nodeKey='';send(main,'window-meta',windowMeta(mainMeta));
+  await liveDebug?.stop();
   ++simulationRequest;++contextSequence;contextTask=Promise.resolve();simulation.reset();watcher?.close();inputWatcher?.close();project=next;contextRig='';documents=new Documents(project,publish);
   const prefs=await settings();prefs.recent=[next.workspaceRoot,...(prefs.recent||[]).filter(p=>p!==next.workspaceRoot&&p!==next.root)].slice(0,8);await writeSettings(prefs);
-  watcher=watch(project.root,{recursive:true},()=>{clearTimeout(timer);timer=setTimeout(()=>refresh().catch(e=>broadcast('error',e.message)),500);});watcher.on('error',e=>broadcast('error',e.message));
+  watcher=watch(project.root,{recursive:true},(_event,file)=>{if(String(file).replaceAll('\\','/').startsWith('.editor/'))return;clearTimeout(timer);timer=setTimeout(()=>refresh().catch(e=>broadcast('error',e.message)),500);});watcher.on('error',e=>broadcast('error',e.message));
   inputWatcher=watch(path.join(project.workspaceRoot,'InputSystem'),{recursive:true},()=>{clearTimeout(timer);timer=setTimeout(()=>refresh().catch(e=>broadcast('error',e.message)),500);});inputWatcher.on('error',e=>broadcast('error',e.message));
+  liveDebug=new LiveDebug(project,documents,{flush:flushDebugEditors,notify:state=>broadcast('live-debug',state)});
+  try{await liveDebug.start();}catch(e){liveDebug.emit('error',e.message);}
   publish(documents.state());broadcast('project',snapshot);return snapshot;
 }
 async function leaveGame(){
@@ -78,13 +94,13 @@ function createWindow(meta={kind:'main',tabs:[],file:''}){
     if(forceClose)return;event.preventDefault();
     if(meta.kind==='postprocessing'){send(win,'postprocess-close-request');return;}
     if(isGame){closeGame().catch(e=>send(win,'error',e.message));return;}
-    if(confirming)return;if(documents?.busy){send(win,'error','正在保存，请稍后关闭窗口');return;}
+    if(confirming)return;if(documents?.busy||liveDebug?.busy){send(win,'error','正在保存，请稍后关闭窗口');return;}
     confirming=true;(async()=>{
       if(dirty()){const r=await dialog.showMessageBox(win,{type:'question',title:ui('还有未保存的修改','Unsaved changes'),message:ui('退出将丢弃尚未保存的草稿。','Quitting will discard unsaved drafts.'),buttons:[ui('返回编辑','Return to editor'),ui('退出并丢弃草稿','Quit and discard drafts')],defaultId:0,cancelId:0});if(!r.response)return;}
-      if(await closeGame()===false)return;forceClose=true;for(const m of [...windows.values()])m.win.destroy();app.quit();
+      if(await closeGame()===false)return;await liveDebug?.stop();forceClose=true;for(const m of [...windows.values()])m.win.destroy();app.quit();
     })().catch(e=>send(win,'error',e.message)).finally(()=>confirming=false);
   });
-  win.on('closed',()=>{for(const [id,m]of windows)if(m.win===win)windows.delete(id);});
+  win.on('closed',()=>{for(const [id,m]of windows)if(m.win===win){windows.delete(id);for(const [key,request]of debugFlushes)if(key.endsWith(':'+id))request.finish('编辑窗口已关闭');}});
   win.loadFile(path.join(__dirname,'..','dist','index.html'),{query:isGame?{game:'1'}:meta.kind==='postprocessing'?{postprocessing:'1'}:{}});return win;
 }
 function openFile(request,caller){
@@ -127,7 +143,11 @@ function handle(name,fn){ipcMain.handle('editor:'+name,(event,...args)=>{const m
 app.whenReady().then(async()=>{
   language=(await settings()).language==='en'?'en':'zh';
   main=createWindow();
-  handle('bootstrap',async meta=>({project:project?await project.snapshot():null,session:documents?.state()||{docs:[],busy:false},meta:windowMeta(meta),settings:await settings(),simulation:simulation.state(),gameOpen:!!game&&!game.isDestroyed(),gameState:games?.state()}));
+  handle('bootstrap',async meta=>({project:project?await project.snapshot():null,session:documents?.state()||{docs:[],busy:false},meta:windowMeta(meta),settings:await settings(),simulation:simulation.state(),gameOpen:!!game&&!game.isDestroyed(),gameState:games?.state(),liveDebug:liveDebug?.state()}));
+  handle('live-debug-flushed',(meta,id,error)=>{
+    const request=debugFlushes.get(id+':'+meta.win.webContents.id);
+    if(request)request.finish(typeof error==='string'?error:'');
+  });
   handle('external',(_m,href)=>{const url=new URL(href);if(!['https:','http:'].includes(url.protocol))throw Error('不支持的链接');return shell.openExternal(url.href);});
   handle('markdown-image',async(_m,document,src)=>{
     await project.resolve(document);
@@ -204,7 +224,7 @@ app.whenReady().then(async()=>{
     if(command==='scene-dirty'){if(meta.kind!=='game'||value?.worldId!==games.selected().id||typeof value.dirty!=='boolean')throw Error('无效场景草稿状态');meta.volumeDirty=value.dirty;return true;}
     if(command==='leave')return leaveGame();
     if(command==='scene'){if(meta.kind!=='game'||!['paused','stopped','error'].includes(simulation.status)||value?.worldId!==games.selected().id)throw Error('请在场景编辑或暂停状态保存 NPC');return games.scene(value.worldId,value.npcs);}
-    if(command==='settings'&&simulation.status==='paused'){const next=await games.settings(value);await simulation.setMovementMultiplier(next.settings.movementMultiplier);return next;}
+    if(command==='settings'&&simulation.status==='paused'){const next=await games.settings(value);await simulation.setMovementMultiplier(next.settings.movementMultiplier);await simulation.setFrameRate(next.settings.fps);return next;}
     if(!['stopped','error'].includes(simulation.status))throw Error('请先返回主菜单');
     if(command==='create')return games.create(value);if(command==='select')return games.select(value);
     if(command==='settings')return games.settings(value);throw Error('未知游戏操作');
@@ -215,7 +235,7 @@ app.whenReady().then(async()=>{
       const request=++simulationRequest;await contextTask;if(request!==simulationRequest)return simulation.state();if(!project||documents.busy)throw Error('项目尚未准备好');
       const w=games.selected();if(request!==simulationRequest)return simulation.state();activeWorldId=w.id;lastGrounded=null;
       const drafts=Object.fromEntries(documents.state().docs.filter(d=>d.dirty).map(d=>[d.path,d.text]));
-      return simulation.start(project,drafts,{...options,mode:'game',environment:w.environment,seed:w.seed,version:w.version,pose:w.pose,npcs:w.npcs,movementMultiplier:games.state().settings.movementMultiplier,rigPath:contextRig||'Assets/CameraAssets/IdleCamera/Player/Default/Default.rig'},command!=='prepare');
+      return simulation.start(project,drafts,{...options,mode:'game',environment:w.environment,seed:w.seed,version:w.version,pose:w.pose,npcs:w.npcs,frameRate:games.state().settings.fps,movementMultiplier:games.state().settings.movementMultiplier,rigPath:contextRig||'Assets/CameraAssets/IdleCamera/Player/Default/Default.rig'},command!=='prepare');
     }
     if(command==='input')return simulation.input(options);if(command==='pause')return simulation.pause();if(command==='resume')return simulation.resume();
     if(command==='stop'||command==='reset'){await leaveGame();return simulation.state();}throw Error('未知模拟命令');
@@ -233,5 +253,5 @@ app.whenReady().then(async()=>{
   async function changeLanguage(next){const s=await settings();s.language=next;await writeSettings(s);language=next;rebuildMenu();broadcast('language',language);if(documents)publish(documents.state());}
   rebuildMenu();
 });
-app.on('window-all-closed',()=>{simulation.stop(false);watcher?.close();inputWatcher?.close();clearTimeout(timer);app.quit();});
+app.on('window-all-closed',()=>{simulation.stop(false);watcher?.close();inputWatcher?.close();clearTimeout(timer);liveDebug?.stop().catch(()=>{});app.quit();});
 app.on('before-quit',event=>{if(!forceClose&&main&&!main.isDestroyed()){event.preventDefault();main.close();}});

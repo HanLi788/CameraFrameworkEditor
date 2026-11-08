@@ -6,6 +6,9 @@ local Dispatcher=require('Foundation.Event.Dispatcher.EventDispatcher')
 local Runtime=require('CameraFramework.Runtime')
 local Channels=require('CameraFramework.CameraSystem.Core.InputChannels')
 local options=bundle.options
+local frameRate=options.frameRate or 60
+local frameRates={[30]=true,[60]=true,[90]=true,[120]=true}
+assert(frameRates[frameRate], '无效模拟帧率')
 local preset=options.preset
 local function point(v) return Vector.New(v[1],v[2],v[3]) end
 local pipeline=require('CameraFramework.CameraSystem.Pipeline.AssetLibrary').GetDefault():Get(options.pipelinePath)
@@ -82,7 +85,7 @@ local function sample()
     local rot=output.CameraRot
     local opacity={}
     for i,component in ipairs(world.MeshComponents) do local m=component.Materials[0];if m and m.Parameters and m.Parameters.Opacity then opacity[tostring(i)]=m.Parameters.Opacity end end
-    return {postProcessing=runtime.PostProcessing:GetValues(),phase=phase,time=time,hold=hold,rigPath=options.rigPath,space=space,environment=options.environment,motion=options.motion or 'idle',meshOpacity=opacity,heading=owner.Rotation.Yaw,speed=owner.Velocity:Length(),
+    return {frameRate=frameRate,deltaTime=1/frameRate,postProcessing=runtime.PostProcessing:GetValues(),phase=phase,time=time,hold=hold,rigPath=options.rigPath,space=space,environment=options.environment,motion=options.motion or 'idle',meshOpacity=opacity,heading=owner.Rotation.Yaw,speed=owner.Velocity:Length(),
         target=channelValues(current.CameraContext.TargetFrameState),render=channelValues(current.CameraContext.RenderFrameState),
         output=channelValues(output),location=vector(output.CameraLoc),
         forward=vector(Adapters.UEMath.GetForwardVector(rot)),up=vector(Adapters.UEMath.GetUpVector(rot)),
@@ -136,7 +139,11 @@ for line in io.lines() do
         local command=Json.Decode(line)
         if command.kind=='step' then
             assert(type(command.count)=='number' and command.count%1==0 and command.count>=1 and command.count<=120,'无效帧数')
-            for _=1,command.count do step(1/60) end
+            for _=1,command.count do step(1/frameRate) end
+            return {frame=sample()}
+        elseif command.kind=='frame-rate' then
+            assert(frameRates[command.frameRate], '无效模拟帧率')
+            frameRate=command.frameRate
             return {frame=sample()}
         elseif command.kind=='stop' then runtime:Destroy();return {stopped=true}
         else error('未知预览命令') end

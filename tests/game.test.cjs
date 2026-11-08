@@ -128,11 +128,11 @@ test('movement multiplier changes locomotion, preserves dash and simulation time
   await assert.rejects(()=>b.setMovementMultiplier(10));
  }finally{a.stop();b.stop();}
 });
-test('live scheduler emits every 1/60 second Lua step and measures cost',async()=>{
- const times=[],s=new Simulation(state=>{if(state.status==='running'&&state.frame)times.push(state.frame.time);});
+test('live scheduler reports completed fixed-step batches and measures cost',async()=>{
+ const times=[],s=new Simulation(state=>{if(state.status==='running'&&state.frame)times.push({time:state.frame.time,steps:state.timing?.batchSteps||0});});
  try{await s.start(project,{}, {...options,environment:'basic'});await new Promise(r=>setTimeout(r,650));await s.pause();
-  const unique=times.filter((v,i)=>!i||v!==times[i-1]);assert.ok(unique.length>12);
-  for(let i=1;i<unique.length;i++)assert.ok(Math.abs(unique[i]-unique[i-1]-1/60)<1e-9);
+  const unique=times.filter((v,i)=>!i||v.time!==times[i-1].time);assert.ok(unique.length>12);
+  for(let i=1;i<unique.length;i++)assert.ok(Math.abs(unique[i].time-unique[i-1].time-unique[i].steps/60)<1e-9);
   assert.ok(s.timing.stepMs>=0);console.log('Live Lua timing:',s.timing,'frames:',unique.length);
  }finally{s.stop();}
 });

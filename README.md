@@ -1,5 +1,15 @@
 # CameraFrameworkEditor · 相机框架编辑器 v0.6.0
 
+## UE 实时参数调试
+
+编辑器打开 Lua 工作区后自动建立调试会话，状态栏显示“UE 调试就绪 · Ctrl+S”。首次更新配套 Lua 代码和 Test 输入映射后，重启一次 UE PIE；之后保持 UE 游戏视口焦点，按左 Ctrl+S，编辑器会在后台提交所有编辑窗口的待提交参数、保存全部草稿、校验真实 Lua 资产并更新后处理计划。只有保存成功，LuaPlayer 才在 Tick 末尾重装相机；状态栏会显示保存、等待重装和 UE 已更新的结果。失败原因可在状态提示及 Lua 日志查看。
+
+Ctrl+S 使用 UE 既有 InputSystem 的 Test.ResetCameraRuntime 映射，经过工作区 .editor/live-debug/ 的请求与回执通知后台编辑器。没有系统全局键盘钩子或按键注入，不影响其他应用的保存快捷键，也不切换焦点。会话和请求按工作区隔离，重复输入合并，过期会话及旧请求不能触发重装。编辑器离线时，UE 的左 Ctrl+S 仅重新读取已经保存的磁盘参数。
+
+相机重装会清理资产缓存，保留当前装置请求、镜头画面和后处理历史；候选装配失败继续使用旧相机。外部镜头接管期间延后重装。此功能更新资产参数，Lua 模块源码变更仍需项目原有热更新或重启。正常的编辑器内 Ctrl+S 保留“保存当前文件”的行为，UE 中的调试 Ctrl+S 保存全部草稿。
+
+新增回归入口：`node --test tests/live-debug.test.cjs` 验证真实 Lua 客户端握手、保存与失败隔离；`node tests/live-debug-ui.cjs` 验证多草稿后台保存、重装确认和焦点保持，支持 `--packaged`。
+
 独立 Windows 桌面应用。工具与项目分开存放；编辑器直接扫描框架内的资产文件，引用使用相对于 `CameraFramework/` 的明确路径。不再需要 `Index.json` 或资产稳定 ID；目录仅用于物理组织。
 
 ## 启动
@@ -59,6 +69,12 @@ $env:ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/'
 
 ## 可玩的相机试验场
 
+游戏设置的帧率上限支持 30、60、90、120 FPS，同时控制 Lua 逻辑和画面的目标频率。每个逻辑步按所选频率传入 1/FPS 秒，依次更新输入、角色、碰撞、相机及后处理；画面直接显示最新结果，没有额外的显示插值缓冲。暂停时可以修改频率，保存后保持当前时间、姿态和装置，继续游戏即使用新步长。设置会持久化，菜单背景仍为 30 FPS，实际画面帧率受显示器刷新率和渲染性能限制。
+
+调度器按单调时钟累计待执行步数，每批最多补执行 8 步并让出事件循环，不丢弃落后时间、不扩大 DeltaTime。暂停和恢复重新建立墙钟基准，不补算暂停时间。视口右下角分别显示画面 FPS、最近实际逻辑频率／目标 Hz，以及存在时的落后毫秒数；性能不足时会显示落后，不能保证任意设备都持续达到目标频率。
+
+帧率回归：`node --test tests/simulation-clock.test.cjs tests/frame-rates.test.cjs tests/render-frames.test.cjs tests/game-worlds.test.cjs` 检查分批追帧、30/60/90/120Hz 实际 Lua 步长、移动距离、过渡时长、平滑响应及设置持久化；`node tests/frame-rates-ui.cjs` 检查实际窗口中的频率同步、暂停切换、最新姿态和诊断显示，支持 `--packaged`。
+
 独立游戏窗口使用程序化像素方块原野，玩家与 NPC 均为编辑器原创方块人物：青色上衣玩家、赭黄色上衣向导，保留行走、奔跑、跳跃与对话表现。地图和人物无需外部模型或纹理；不提供地图搭建、Actor 放置或层级编辑。
 
 主窗口绿色 **▶** 只打开游戏主菜单，不启动 Lua 模拟；重复点击聚焦已有游戏窗口。红色 **■** 结束游戏并关闭窗口，效果与游戏窗口的原生关闭按钮相同。窗口大小和位置会记住。
@@ -87,7 +103,7 @@ $env:ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/'
 | 对话面板右上角 × / Esc | 结束对话并执行退出过渡 |
 | 非对话时 Esc | 暂停／继续游戏 |
 
-以上按键是当前工作区的默认配置，实际绑定来自 `InputSystem/MyIMC/Definition/Definitions/*.json`。试玩运行真实 `InputSystem.InputManager`，链路为：浏览器物理按键／鼠标信号 → RuntimeHandle.OnPressed/OnReleased/OnChanged → SignalManager → KeyManager → IMCManager → InputHandle → 角色能力与相机 InputService。每个固定 1/60 秒逻辑帧先更新输入，再更新角色和相机；宿主只适配文件读取、目录扫描、时钟及原始设备信号。相机挂载的 IMC 由框架自身激活／停用，不再使用伪造 HasMapping 或直接赋值 LookTurn 的句柄。
+以上按键是当前工作区的默认配置，实际绑定来自 `InputSystem/MyIMC/Definition/Definitions/*.json`。试玩运行真实 `InputSystem.InputManager`，链路为：浏览器物理按键／鼠标信号 → RuntimeHandle.OnPressed/OnReleased/OnChanged → SignalManager → KeyManager → IMCManager → InputHandle → 角色能力与相机 InputService。每个逻辑帧使用所选帧率对应的固定步长，先更新输入，再更新角色和相机；宿主只适配文件读取、目录扫描、时钟及原始设备信号。相机挂载的 IMC 由框架自身激活／停用，不再使用伪造 HasMapping 或直接赋值 LookTurn 的句柄。
 
 角色读取 Character/MoveForward、MoveRight 的真实值，保留小于 1 的轴幅度；Jump、Dash 订阅 SourceStarted，短按与组合键生命周期由真实输入系统处理。Run、Walk 优先读取同名映射，未定义时分别使用 AbilitySlot06、AbilitySlot09。鼠标向上转换为正 MouseY，滚轮转换为正向上滚的原始单位，观察灵敏度属于设备侧增益；映射响应、平滑、倍率和资产权重仍由 Lua 处理。Esc 暂停／退出和 NPC 气泡属于编辑器窗口／交互界面命令。失焦发送真实释放信号，暂停在原时间清理按键；映射自身的平滑尾部仍会按配置收敛。
 

@@ -9,9 +9,11 @@ import Icon,{IconButton,assetIcons} from './Icon';
 import DirectoryTree from './DirectoryTree';
 import RigWorkspace from './RigWorkspace';
 import {buildRigTree,rigOwners,findOccurrence} from './rigGraph.mjs';
+import LiveDebugStatus from './LiveDebugStatus';
 const api=window.cameraEditor;
 const errorText=(e:any)=>String(e?.message||e).replace(/^Error invoking remote method '[^']+': Error: /,'');
 export default function App(){
+ const [liveDebug,setLiveDebug]=useState<any>({status:'offline'});
  useLanguage();const [project,setProject]=useState<Snapshot|null>(null),[session,setSession]=useState<any>({docs:[],busy:false}),[meta,setMeta]=useState<any>({file:'',tabs:[]});
  const [loaded,setLoaded]=useState(false),[recent,setRecent]=useState<string[]>([]),[dir,setDir]=useState('Assets'),[left,setLeft]=useState(260),[locate,setLocate]=useState<any>(null),[gameOpen,setGameOpen]=useState(false);
  const [issues,setIssues]=useState<any[]>([]),[message,setMessage]=useState('就绪'),[error,setError]=useState(''),[busy,setBusy]=useState(false),[showIssues,setShowIssues]=useState(false);
@@ -21,11 +23,13 @@ export default function App(){
  const report=(e:any)=>{setError(errorText(e));};const send=(p:Promise<any>)=>p.catch(report);
  const perform=async(fn:()=>Promise<any>)=>{setBusy(true);try{return await fn();}catch(e){report(e);}finally{setBusy(false);}};
  useEffect(()=>{const remove=api.onEvent((e:any)=>{
+  if(e.type==='live-debug')setLiveDebug(e.payload);
+  if(e.type==='flush-live-debug')flushRangeEdits().then(()=>api.liveDebugFlushed(e.payload),error=>api.liveDebugFlushed(e.payload,String(error?.message||error))).catch(report);
   if(e.type==='language')setLanguage(e.payload);if(e.type==='project'){setProject(e.payload);setIssues(e.payload.issues);}
   if(e.type==='session')setSession(e.payload);if(e.type==='window-meta')setMeta(e.payload);if(e.type==='game-window')setGameOpen(e.payload);
   if(e.type==='locate'){setSidebarHidden(false);api.preferences({layout:{sidebarHidden:false}}).catch(report);api.closeDetail().catch(report);setDir(e.payload.split('/').slice(0,-1).join('/'));setLocate({path:e.payload});setMessage('已在目录中定位');}
   if(e.type==='error')report(e.payload);if(e.type==='command')commands.current[e.payload]?.();
- });api.bootstrap().then((s:any)=>{setProject(s.project);setSession(s.session);setMeta(s.meta);setGameOpen(s.gameOpen);setLanguage(s.settings.language==='en'?'en':'zh');setRecent(s.settings.recent||[]);setLeft(s.settings.layout?.left||260);setSidebarHidden(s.settings.layout?.sidebarHidden===true);setIssues(s.project?.issues||[]);setLoaded(true);}).catch(report);return remove;},[]);
+ });api.bootstrap().then((s:any)=>{setProject(s.project);setSession(s.session);setMeta(s.meta);setGameOpen(s.gameOpen);setLiveDebug(s.liveDebug);setLanguage(s.settings.language==='en'?'en':'zh');setRecent(s.settings.recent||[]);setLeft(s.settings.layout?.left||260);setSidebarHidden(s.settings.layout?.sidebarHidden===true);setIssues(s.project?.issues||[]);setLoaded(true);}).catch(report);return remove;},[]);
  const assets=useMemo(()=>project?.assets.map(a=>{const d=session.docs.find((d:any)=>d.path===a.path),data=d?(parse(d.text)||a.data):a.data;return {...a,data,refs:collectReferences(data)};})||[],[project,session]);
  const owners=useMemo(()=>rigOwners(assets),[assets]);
  const directories=useMemo(()=>rigDirectories(project?.directories||[],project?.files||[]),[project?.directories,project?.files]);
@@ -63,7 +67,7 @@ export default function App(){
    {invalidDrafts&&<div className="graph-draft-warning"><Icon name="warning" size={14}/>{t('存在无效 JSON 草稿，相关引用树与共享统计暂按已保存结构显示。')}</div>}
 
   </main></div>
-  <footer className="statusbar"><span className={'status-dot '+(disabled?'busy':'')}/><span className="status-message">{t(message)}</span><div className="spacer"/><button onClick={()=>setShowIssues(v=>!v)}>{t('诊断')} {issues.length||''}</button><span>{dirtyCount?dirtyCount+t(' 份共享草稿'):t('全部已保存')}</span><span>v0.6.0</span></footer>
+  <footer className="statusbar"><span className={'status-dot '+(disabled?'busy':'')}/><span className="status-message">{t(message)}</span><LiveDebugStatus state={liveDebug}/><div className="spacer"/><button onClick={()=>setShowIssues(v=>!v)}>{t('诊断')} {issues.length||''}</button><span>{dirtyCount?dirtyCount+t(' 份共享草稿'):t('全部已保存')}</span><span>v0.6.0</span></footer>
   <DetailDialog effectCatalog={project.effectCatalog} inputCatalog={project.inputCatalog} meta={meta} session={session} assets={assets} owners={owners} siblings={siblings} onSibling={selectSibling} open={openDependency} onOwner={openOwner} onClose={closeDetail} onBack={()=>send(api.detailBack())} save={(all:boolean)=>perform(()=>save(all))} send={send} report={report} disabled={disabled} overlays={meta.detailOpen?errors:null}/>
   {showIssues&&<div className="modal-overlay"><div className="modal diagnostics"><h2>{t('项目诊断')}</h2>{issues.map((i,n)=><button className={'problem '+i.severity} key={n} onClick={()=>{if(i.path){open(i.path);setShowIssues(false);}}}><div><b>{i.message}</b><small>{i.path} {i.field}</small></div></button>)}<div className="modal-actions"><button onClick={()=>setShowIssues(false)}>{t('关闭')}</button></div></div></div>}{!meta.detailOpen&&errors}
 

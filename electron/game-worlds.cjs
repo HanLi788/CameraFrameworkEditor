@@ -2,6 +2,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('n
 const {globalVolume,validateVolumes}=require('./post-volumes.cjs');
 const {defaultNpcs,validateNpcs}=require('./scene-actors.cjs');
 const {normalize}=require('./procedural-world.cjs');
+const {FRAME_RATES}=require('./simulation-clock.cjs');
 const builtin={id:'lab',name:'默认实验场',environment:'lab',seed:'camera-lab',version:1,builtin:true};
 const defaults={quality:'medium',fps:60,sensitivity:1,movementMultiplier:1};
 class GameWorlds{
@@ -15,7 +16,7 @@ class GameWorlds{
  async write(){await fs.mkdir(path.dirname(this.file),{recursive:true});const tmp=this.file+'.'+crypto.randomUUID()+'.tmp';try{await fs.writeFile(tmp,JSON.stringify(this.data,null,2),'utf8');await fs.rename(tmp,this.file);}finally{await fs.unlink(tmp).catch(()=>{});}}
  create({name,seed}){return this.serial(async()=>{name=String(name||'').trim();if(!name||name.length>64)throw Error('世界名称须为 1–64 个字符');const config=normalize({environment:'explore',seed,version:1});const world={id:crypto.randomUUID(),name,environment:'explore',seed:config.seed,version:config.version,createdAt:new Date().toISOString()};this.data.worlds.push(world);this.data.selected=world.id;await this.write();return this.state();});}
  select(id){return this.serial(async()=>{if(!this.state().worlds.some(w=>w.id===id))throw Error('世界存档不存在');this.data.selected=id;await this.write();return this.state();});}
- settings(patch){return this.serial(async()=>{patch={...this.data.settings,...patch};if(!['low','medium','high'].includes(patch.quality)||![30,60].includes(patch.fps)||!Number.isFinite(patch.sensitivity)||patch.sensitivity<.25||patch.sensitivity>3||!Number.isFinite(patch.movementMultiplier)||patch.movementMultiplier<.25||patch.movementMultiplier>4)throw Error('游戏设置无效');this.data.settings={quality:patch.quality,fps:patch.fps,sensitivity:patch.sensitivity,movementMultiplier:patch.movementMultiplier};await this.write();return this.state();});}
+ settings(patch){return this.serial(async()=>{patch={...this.data.settings,...patch};if(!['low','medium','high'].includes(patch.quality)||!FRAME_RATES.includes(patch.fps)||!Number.isFinite(patch.sensitivity)||patch.sensitivity<.25||patch.sensitivity>3||!Number.isFinite(patch.movementMultiplier)||patch.movementMultiplier<.25||patch.movementMultiplier>4)throw Error('游戏设置无效');this.data.settings={quality:patch.quality,fps:patch.fps,sensitivity:patch.sensitivity,movementMultiplier:patch.movementMultiplier};await this.write();return this.state();});}
  checkpoint(id,frame){return this.serial(async()=>{const w=this.data.worlds.find(w=>w.id===id);if(!w||!frame||frame.worldKey!==`${w.version}:explore:${w.seed}`||!frame.grounded)return this.state();const p=frame.owner;if(!p||![p.X,p.Y,p.Z,frame.heading].every(Number.isFinite)||Math.abs(p.X)>6400||Math.abs(p.Y)>6400||p.Z<-1000||p.Z>10000)return this.state();w.pose={position:{...p},heading:frame.heading};w.lastPlayed=new Date().toISOString();await this.write();return this.state();});}
 }
 module.exports={GameWorlds};

@@ -6,6 +6,7 @@ import {t,useLanguage,setLanguage} from './i18n';
 import Icon,{IconButton} from './Icon';
 import EffectChannelTable from './EffectChannelTable';
 import {postGroupLabel,postGroupIcon,postChannelLabel,matchesPostChannel} from './postProcessingLabels.mjs';
+import {flushRangeEdits} from './rangeDrafts';
 const api=window.cameraEditor;
 const clampRatio=(value:number)=>Math.max(.2,Math.min(.6,Number.isFinite(value)?value:.4));
 export default function PostProcessingWindow(){
@@ -17,6 +18,7 @@ export default function PostProcessingWindow(){
  const persistRatio=(next:number)=>{next=clampRatio(next);setRatio(next);api.preferences({layout:{postProcessingRatio:next}}).catch(report);};
  useEffect(()=>{
   const off=api.onEvent((e:any)=>{
+   if(e.type==='flush-live-debug')flushRangeEdits().then(()=>queue.current).then(()=>api.liveDebugFlushed(e.payload),error=>api.liveDebugFlushed(e.payload,String(error?.message||error))).catch(report);
    if(e.type==='project')setProject(e.payload);if(e.type==='session')setSession(e.payload);if(e.type==='language')setLanguage(e.payload);if(e.type==='window-meta')setMeta(e.payload);
    if(e.type==='postprocess-close-request')queue.current.then(()=>api.closePostProcessing()).catch(report);if(e.type==='error')report(e.payload);
    if(e.type==='command'){const file=latest.current.meta.file;

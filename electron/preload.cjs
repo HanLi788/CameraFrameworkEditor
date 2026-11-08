@@ -1,6 +1,7 @@
 const {contextBridge,ipcRenderer}=require('electron');
 const invoke=name=>(...args)=>ipcRenderer.invoke('editor:'+name,...args);
 contextBridge.exposeInMainWorld('cameraEditor',{
+  liveDebugFlushed:invoke('live-debug-flushed'),
   markdownImage:invoke('markdown-image'),external:invoke('external'),game:invoke('game'),pinTab:invoke('pin-tab'),scene:invoke('scene'),simulate:invoke('simulation'),bootstrap:invoke('bootstrap'),settings:invoke('settings'),chooseProject:invoke('choose-project'),openProject:invoke('open-project'),snapshot:invoke('snapshot'),read:invoke('read'),ensure:invoke('ensure'),
   postBindings:invoke('post-bindings'),closePostProcessing:invoke('close-postprocessing'),openPostProcessing:invoke('open-postprocessing'),
   closeDetail:invoke('close-detail'),detailBack:invoke('detail-back'),selectTab:invoke('select-tab'),closeTab:invoke('close-tab'),openFile:invoke('open-file'),context:invoke('context'),editText:invoke('edit-text'),editField:invoke('edit-field'),history:invoke('history'),reload:invoke('reload'),discard:invoke('discard'),saveSession:invoke('save-session'),

@@ -1,6 +1,7 @@
 const fs=require('node:fs/promises'),path=require('node:path'),{spawn}=require('node:child_process');
 const presets=require('./preview-presets.json');
 const {getWorld}=require('./world-service.cjs');
+const {FRAME_RATES,SimulationClock}=require('./simulation-clock.cjs');
 // Only generated numeric geometry is serialized here. Keep large static meshes out
 // of the project's strict JSON decoder, whose remaining-string scans are costly.
 function luaData(value){
@@ -58,6 +59,9 @@ class Simulation {
   async start(project,overrides,options,autoplay=true){
     this.stop(false);const generation=++this.generation;this.status='loading';this.error='';this.frame=null;this.signals=[];this.actions=[];this.timing=null;this.emit();
     try{
+      options={...options,frameRate:options.frameRate??60};
+      if(!FRAME_RATES.includes(options.frameRate))throw Error('帧率须为 30、60、90 或 120');
+      this.frameRate=options.frameRate;
       if(options.mode!==undefined&&!['game','demo'].includes(options.mode))throw Error('未知运行模式');
       if(options.id!==undefined&&!(typeof options.id==='string'&&options.id.trim()||Number.isSafeInteger(options.id)))throw Error('业务 ID 必须是安全整数或非空字符串');
       if(!Number.isFinite(options.speed??0)||Math.abs(options.speed??0)>100000)throw Error('速度超出预览范围');
@@ -69,16 +73,23 @@ class Simulation {
     }catch(e){if(generation===this.generation){this.status='error';this.error=e.message;this.process?.destroy();this.process=null;this.emit();}throw e;}
   }
   schedule(){
-    clearTimeout(this.timer);const id=this.scheduleId=(this.scheduleId||0)+1,period=1000/60;let deadline=performance.now()+period;
+    clearTimeout(this.timer);const id=this.scheduleId=(this.scheduleId||0)+1,clock=new SimulationClock(this.frameRate,performance.now());this.clock=clock;
     const tick=async()=>{
       if(id!==this.scheduleId||this.status!=='running')return;
-      const started=performance.now();
-      try{if(!this.inFlight)await this.step(1);}catch{return;}
+      if(this.inFlight){this.timer=setTimeout(tick,1);return;}
+      const count=clock.due(performance.now());
+      try{if(count)await this.step(count);}catch{return;}
       if(id!==this.scheduleId||this.status!=='running')return;
-      const now=performance.now();this.timing={stepMs:now-started,lateMs:Math.max(0,started-deadline)};
-      deadline+=period;if(now-deadline>period*4)deadline=now+period;
-      this.timer=setTimeout(tick,Math.max(0,deadline-now));
-    };this.timer=setTimeout(tick,period);
+      this.timer=setTimeout(tick,clock.delay(performance.now()));
+    };this.timer=setTimeout(tick,clock.period);
+  }
+  async setFrameRate(value){
+    if(!FRAME_RATES.includes(value))throw Error('帧率须为 30、60、90 或 120');
+    if(this.status!=='paused'||!this.process)throw Error('请先暂停模拟');
+    const generation=this.generation;while(this.inFlight)await this.inFlight.catch(()=>{});
+    if(generation!==this.generation||this.status!=='paused')throw Error('模拟状态已改变');
+    if(value===this.frameRate)return this.state();
+    return this.advance({kind:'frame-rate',frameRate:value});
   }
   async setMovementMultiplier(value){
     if(!Number.isFinite(value)||value<.25||value>4)throw Error('移动速度倍率须为 0.25–4');
@@ -93,8 +104,18 @@ class Simulation {
   }
   async advance(command){
     if(!this.process||this.inFlight)throw Error('模拟尚未准备好');const generation=this.generation;
+    const started=performance.now(),clock=this.clock;
     const promise=this.process.request(command);this.inFlight=promise;
-    try{const result=await promise;if(generation===this.generation){this.frame=result.frame;this.emit();}return this.state();}
+    try{const result=await promise;if(generation===this.generation){
+      this.frame=result.frame;
+      if(command.kind==='frame-rate'){this.frameRate=result.frame.frameRate;this.timing=null;}
+      if(command.kind==='step'){
+        const now=performance.now(),batchMs=now-started;
+        if(clock&&clock===this.clock)clock.complete(command.count);
+        this.timing={...(clock?.metrics(now)||{targetHz:this.frameRate,actualHz:null,lateMs:0}),stepMs:batchMs/command.count,batchMs,batchSteps:command.count};
+      }
+      this.emit();
+    }return this.state();}
     catch(e){if(generation===this.generation){clearTimeout(this.timer);this.status='error';this.error=e.message;this.process?.destroy();this.process=null;this.emit();}throw e;}
     finally{if(this.inFlight===promise)this.inFlight=null;}
   }
@@ -114,9 +135,9 @@ class Simulation {
     return true;
   }
   async closeDialoguePaused(){const generation=this.generation;while(this.inFlight)await this.inFlight.catch(()=>{});if(generation!==this.generation||this.status!=='paused')return false;return this.advance({kind:'interaction',action:'close-dialogue'});}
-  async pause(){this.scheduleId=(this.scheduleId||0)+1;const generation=this.generation;this.input({clear:true});clearTimeout(this.timer);if(this.status==='running')this.status='paused';while(this.inFlight)await this.inFlight.catch(()=>{});if(generation!==this.generation)return this.state();if(this.process&&this.frame?.mode==='game'){await this.advance({kind:'clear-input'});this.signals=[];}return this.emit();}
+  async pause(){this.scheduleId=(this.scheduleId||0)+1;const generation=this.generation;this.input({clear:true});clearTimeout(this.timer);if(this.status==='running')this.status='paused';while(this.inFlight)await this.inFlight.catch(()=>{});if(generation!==this.generation)return this.state();this.clock=null;if(this.process&&this.frame?.mode==='game'){await this.advance({kind:'clear-input'});this.signals=[];}return this.emit();}
   resume(){if(this.status!=='paused'||!this.process)throw Error('没有可恢复的模拟');this.status='running';this.schedule();return this.emit();}
-  stop(emit=true){this.scheduleId=(this.scheduleId||0)+1;++this.generation;clearTimeout(this.timer);this.process?.destroy();this.process=null;this.inFlight=null;this.status='stopped';this.error='';this.frame=this.initial||null;if(emit)return this.emit();}
+  stop(emit=true){this.scheduleId=(this.scheduleId||0)+1;++this.generation;clearTimeout(this.timer);this.clock=null;this.process?.destroy();this.process=null;this.inFlight=null;this.status='stopped';this.error='';this.frame=this.initial||null;if(emit)return this.emit();}
   reset(){this.stop(false);this.initial=null;this.frame=null;return this.emit();}
 }
 module.exports={Simulation,bundleProject,LuaPreview};

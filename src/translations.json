@@ -733,5 +733,16 @@
   "搜索后处理参数": "Search postprocessing parameters",
   "此通道暂不支持 WebGL 画面预览": "This channel has no WebGL visual preview yet",
   "临时覆盖 · 退出调试后恢复": "Temporary overrides · Cleared when leaving debug",
-  "调参仅临时覆盖当前预览，恢复或退出后重新使用玩法输出。点击游戏画面可继续操作角色；F8 切换调试。": "Adjustments override this preview only. Restore or exit to use gameplay output. Click the game viewport to control the character; F8 toggles debug."
+  "调参仅临时覆盖当前预览，恢复或退出后重新使用玩法输出。点击游戏画面可继续操作角色；F8 切换调试。": "Adjustments override this preview only. Restore or exit to use gameplay output. Click the game viewport to control the character; F8 toggles debug.",
+  "UE 调试就绪 · Ctrl+S": "UE debugging ready · Ctrl+S",
+  "正在保存到 UE…": "Saving for UE…",
+  "等待 UE 重装…": "Waiting for UE reload…",
+  "UE 相机已更新": "UE camera updated",
+  "UE 调试失败": "UE debugging failed",
+  "UE 调试未连接": "UE debugging offline",
+  "保持 UE 游戏视口焦点，按左 Ctrl+S 保存全部草稿并重装相机。保存失败时保留原相机。": "Keep the UE game viewport focused. Press Left Ctrl+S to save all drafts and reload the camera. Failed saves preserve the current camera.",
+  "帧率说明": "Frame rate information",
+  "画面与 Lua 逻辑共同以 30、60、90、120 帧为目标。直接显示最新逻辑结果，实际频率和落后时间显示在视口右下角；实际表现取决于屏幕刷新率和性能。": "Rendering and Lua logic share a target of 30, 60, 90 or 120 frames per second. The latest logic result is displayed directly. Actual rates and lag appear at the bottom right; performance depends on the display and hardware.",
+  "逻辑": "Logic",
+  "落后": "Behind"
 }

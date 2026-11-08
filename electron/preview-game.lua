@@ -7,6 +7,9 @@ local Runtime = require('CameraFramework.Runtime')
 local Channels = require('CameraFramework.CameraSystem.Core.InputChannels')
 local options, preset = bundle.options, bundle.options.preset
 local movementMultiplier=options.movementMultiplier or 1
+local frameRate=options.frameRate or 60
+local frameRates={[30]=true,[60]=true,[90]=true,[120]=true}
+assert(frameRates[frameRate], '无效模拟帧率')
 local function point(v) return Vector.New(v[1],v[2],v[3]) end
 local dispatcher = Dispatcher.New()
 for _, group in pairs(PlayerEvents) do for _, event in pairs(group) do dispatcher:AddEvent(event) end end
@@ -248,7 +251,7 @@ local function sample()
     local phase=not request and 'Idle' or manager.bRigExiting and 'Exiting' or rig:IsEnterTransitioning() and 'Entering' or 'Holding'
     local output=manager.Output.FinalState;local opacity={}
     for i,c in ipairs(world.MeshComponents) do local m=c.Materials[0];if m and m.Parameters and m.Parameters.Opacity then opacity[tostring(i)]=m.Parameters.Opacity end end
-    return {npcs=actorFrames,postProcessing=runtime.PostProcessing:GetValues(),mode='game',time=time,phase=phase,hold=0,space=request and request.CameraType or 'Idle',rigName=request and request.Name or 'Default',rigPath=paths[request and request.Name or 'Default'],
+    return {npcs=actorFrames,frameRate=frameRate,deltaTime=1/frameRate,postProcessing=runtime.PostProcessing:GetValues(),mode='game',time=time,phase=phase,hold=0,space=request and request.CameraType or 'Idle',rigName=request and request.Name or 'Default',rigPath=paths[request and request.Name or 'Default'],
         environment=options.environment,worldKey=options.worldKey,seed=options.seed,version=options.version,owner=vector(owner.Location),subject=npc and vector(npc.Location) or nil,heading=owner.Rotation.Yaw,subjectHeading=npc and npc.Rotation.Yaw or nil,
         movementMultiplier=movementMultiplier,speed=math.sqrt(owner.Velocity.X^2+owner.Velocity.Y^2),grounded=grounded,ability=action or 'Idle',dialogue=dialogue,dialogueClosing=dialogueClosing,npcId=npc and npc.Id or nil,canTalk=available,
         target=values(current.CameraContext.TargetFrameState),render=values(current.CameraContext.RenderFrameState),output=values(output),
@@ -275,7 +278,11 @@ for line in io.lines() do
         local command=Json.Decode(line)
         if command.kind=='step' then
             assert(type(command.count)=='number' and command.count%1==0 and command.count>=1 and command.count<=120,'无效帧数')
-            for i=1,command.count do step(1/60,i==1 and command.signals or {},i==1 and command.actions or {}) end
+            for i=1,command.count do step(1/frameRate,i==1 and command.signals or {},i==1 and command.actions or {}) end
+            return {frame=sample()}
+        elseif command.kind=='frame-rate' then
+            assert(frameRates[command.frameRate], '无效模拟帧率')
+            frameRate=command.frameRate
             return {frame=sample()}
         elseif command.kind=='movement-settings' then
             local value=command.movementMultiplier

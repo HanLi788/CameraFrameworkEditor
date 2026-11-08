@@ -271,3 +271,5 @@ dialog.asset-detail-dialog::backdrop{background:#07101566}
 .post-debug-layout.is-editing{grid-template-columns:minmax(140px,var(--scene-left)) 5px minmax(160px,1fr) 5px minmax(280px,var(--scene-right))}
 .post-debug-inspector .scene-channel-card{margin-top:12px}.post-debug-table th:first-child{width:40%}.post-debug-table th:last-child{width:60%;text-align:left}.post-debug-table td:last-child{text-align:left}
 .post-debug-value{display:flex;align-items:center;gap:4px}.post-debug-value .scene-value{flex:1}.post-debug-value>.icon-button{flex-shrink:0}.post-debug-table tr[data-overridden=true]{background:#293e3d}.post-debug-inspector header strong{overflow-wrap:anywhere}.post-debug-inspector .scene-table-tools input{min-width:0}
+
+.live-debug-status{max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8da2b8}.live-debug-status.reloaded,.live-debug-status.ready{color:#75ba99}.live-debug-status.error{color:#f19a8d}.live-debug-status.saving,.live-debug-status.waiting{color:#e8c17d}

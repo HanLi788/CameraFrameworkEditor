@@ -5,6 +5,7 @@ import HelpTip from './HelpTip';
 import {t} from './i18n';
 import Icon,{IconButton} from './Icon';
 import {useEffect,useRef,useState} from 'react';
+import {createRenderClock} from './renderFrames.mjs';
 import * as THREE from 'three';
 import {Asset} from './types';
 const api=window.cameraEditor;
@@ -38,6 +39,7 @@ export default function Preview({assets,simulation,onCommand,world,attract,launc
   const command=useRef(onCommand);command.current=onCommand;
   const performanceRef=useRef<HTMLSpanElement>(null);
   const status=launching?'loading':simulation?.status||'stopped';const worldKey=`1:${environment}:${environment==='lab'?'camera-lab':seed}`;const frame=simulation?.frame?.worldKey===worldKey?simulation.frame:initialFrame([],environment);latest.current={frame:attract?initialFrame([],environment):frame,view:attract?'orbit':'camera',status,attract,settings,catalog,npcs,postProcessing:{...frame.postProcessing,...(debug?overrides:{})}};
+  latest.current.timing=simulation?.timing;
 
   const mouse=useRef({x:0,y:0,raf:0});
   const flushMouse=()=>{const m=mouse.current;cancelAnimationFrame(m.raf);m.raf=0;if(m.x||m.y){command.current('input',{signals:[{kind:'changed',name:'MouseX',value:m.x},{kind:'changed',name:'MouseY',value:m.y}]});m.x=0;m.y=0;}};
@@ -95,11 +97,12 @@ export default function Preview({assets,simulation,onCommand,world,attract,launc
     const body=new THREE.Mesh(new THREE.BoxGeometry(.35,.23,.4),new THREE.MeshStandardMaterial({color:'#dcb57c'}));scene.add(body);
     let camera:THREE.PerspectiveCamera|THREE.OrthographicCamera=perspective;let helper=new THREE.CameraHelper(camera);scene.add(helper);
     const world=new PreviewWorld(scene,owner,subject,grid),post=new GamePostProcessing();sceneRef.current={observer,world,renderer,scene,light};
-    let previous=performance.now(),rendered=previous,count=0,stamp=previous,infoStamp=0;
+    let rendered=performance.now(),count=0,stamp=rendered,infoStamp=0;
+    const renderDue=createRenderClock();
     const resize=()=>{const w=el.clientWidth,h=el.clientHeight;if(w&&h){renderer.setSize(w,h);observer.aspect=w/h;observer.updateProjectionMatrix();}};const ro=new ResizeObserver(resize);ro.observe(el);resize();
     renderer.setAnimationLoop(()=>{
-      const now=performance.now(),interval=1000/(latest.current?.attract?30:latest.current?.settings?.fps||60);
-      if(document.hidden||now-previous<interval)return;previous=now-(now-previous)%interval;const dt=(now-rendered)/1000;rendered=now;
+      const now=performance.now(),fps=latest.current?.attract?30:latest.current?.settings?.fps||60;
+      if(document.hidden||!renderDue(now,fps))return;const dt=(now-rendered)/1000;rendered=now;
       const f=latest.current?.frame;if(!f)return;const mode=latest.current.view,v=f.output;
       const wanted=f.projection==='Orthographic'?orthographic:perspective;if(wanted!==camera){scene.remove(helper);helper.dispose();camera=wanted;helper=new THREE.CameraHelper(camera);scene.add(helper);}
       const aspect=v.AspectRatio;perspective.aspect=aspect;perspective.fov=THREE.MathUtils.radToDeg(2*Math.atan(Math.tan(THREE.MathUtils.degToRad(v.FOV)/2)/aspect));perspective.updateProjectionMatrix();
@@ -120,7 +123,12 @@ export default function Preview({assets,simulation,onCommand,world,attract,launc
         button.hidden=!(latest.current.status==='running'&&f.canTalk&&!f.dialogue&&mode==='camera'&&Math.abs(projected.x)<.94&&Math.abs(projected.y)<.94&&projected.z>-1&&projected.z<1&&world.npcVisible(activeCamera,anchor));
         if(!button.hidden){button.style.left=`${(w-cw)/2+(projected.x+1)*cw/2}px`;button.style.top=`${(h-ch)/2+(1-projected.y)*ch/2}px`;}
       }
-      count++;if(now-stamp>=1000){if(performanceRef.current)performanceRef.current.textContent=`${Math.round(count*1000/(now-stamp))} FPS · ${renderer.info.render.calls} draws · ${(renderer.info.render.triangles/1000).toFixed(1)}k △`;stamp=now;count=0;}
+      count++;if(now-stamp>=1000){
+        const timing=latest.current.timing,logic=latest.current.status==='running'&&Number.isFinite(timing?.actualHz)?Math.round(timing.actualHz):'--';
+        const lag=timing?.lateMs>1?` · ${t('落后')} ${Math.round(timing.lateMs)}ms`:'';
+        if(performanceRef.current)performanceRef.current.textContent=`${Math.round(count*1000/(now-stamp))} FPS · ${t('逻辑')} ${logic}/${f.frameRate||latest.current.settings.fps||60} Hz${lag} · ${renderer.info.render.calls} draws · ${(renderer.info.render.triangles/1000).toFixed(1)}k △`;
+        stamp=now;count=0;
+      }
     });
     return()=>{renderer.setAnimationLoop(null);ro.disconnect();post.dispose();world.dispose();scene.traverse((o:any)=>{o.geometry?.dispose();if(Array.isArray(o.material))o.material.forEach((m:any)=>m.dispose());else o.material?.dispose();});renderer.dispose();el.removeChild(renderer.domElement);sceneRef.current=null;};
   },[]);

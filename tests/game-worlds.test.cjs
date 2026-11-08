@@ -1,5 +1,11 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
 const {GameWorlds}=require('../electron/game-worlds.cjs');
+
+test('90 and 120 FPS settings persist, unsupported rates are rejected without changing saves',async()=>{
+ const storage=await fs.mkdtemp(path.join(os.tmpdir(),'world-fps-')),store=await new GameWorlds(storage,'D:/FrameRates').load();
+ for(const fps of [90,120]){await store.settings({fps});const reopened=await new GameWorlds(storage,'D:/FrameRates').load();assert.equal(reopened.state().settings.fps,fps);}
+ await assert.rejects(()=>store.settings({fps:144}));assert.equal(store.state().settings.fps,120);
+});
 test('world saves persist selection, seed, grounded pose and settings, isolated per project',async()=>{
  const storage=await fs.mkdtemp(path.join(os.tmpdir(),'world-saves-')),a=await new GameWorlds(storage,'D:/ProjectA').load();assert.equal(a.selected().id,'lab');
  await a.create({name:'沼泽探索',seed:'swamp-42'});const w=a.selected();assert.equal(w.environment,'explore');assert.equal(w.version,1);
