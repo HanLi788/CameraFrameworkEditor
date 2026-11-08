@@ -20,13 +20,13 @@ npm.cmd start
 
 发布目录 `release/win-unpacked` 可整体复制运行，无需另装 Node.js 或 Lua；不要单独复制 exe。
 
-## 生成安装包
+## 构建编辑器
 
-双击工具根目录的 **生成安装包.bat**。脚本检查 Node.js 22.12+ 和 npm，缺少构建依赖时按 package-lock.json 自动安装，再显式准备 Electron 运行文件，随后编译并生成 Windows x64 NSIS 安装包。首次下载依赖、Electron 或 NSIS 工具需要联网；构建失败会停下并保留错误信息。
+双击工具根目录的 **构建编辑器.bat**。脚本检查 Node.js 22.12+ 和 npm，缺少构建依赖时按 package-lock.json 自动安装，再显式准备 Electron 运行文件，随后编译并生成可直接运行的编辑器目录（release/win-unpacked/）和 Windows x64 NSIS 安装包。成功提示会同时显示程序与安装包路径。首次下载依赖、Electron 或 NSIS 工具需要联网；构建失败会停下并保留错误信息。
 
 输出为 `release/CameraFrameworkEditor-<版本>-Setup.exe`，安装向导支持选择安装目录、创建桌面快捷方式。安装程序包含应用和 Lua 运行时，使用者无需安装 Node.js；Lua 工作区仍由启动后自行选择。
 
-自动化调用可用 `生成安装包.bat --no-pause`，成功返回 0，失败返回非 0。`npm run package` 保留免安装目录构建；`npm run package:installer` 仅打包当前 dist，需先执行 `npm run build`。
+自动化调用可用 `构建编辑器.bat --no-pause`，成功返回 0，失败返回非 0。`npm run package` 保留免安装目录构建；`npm run package:installer` 仅打包当前 dist，需先执行 `npm run build`。
 
 当前 Electron 将二进制下载延迟到首次运行；仅执行 `npm ci` 可能尚未生成 `node_modules/electron/dist`。批处理及两个 npm 打包命令均先执行 `npm run electron:install`，通过已安装 Electron 包的安装器下载并校验对应版本，已有匹配运行文件时直接复用。缺少运行文件不再触发重复安装全部依赖。若下载失败，可检查网络后重试该命令；不要手工创建空的 dist 目录。机制见 [Electron 安装说明](https://www.electronjs.org/docs/latest/tutorial/installation)。
 
@@ -34,7 +34,7 @@ GitHub 下载较慢时，可在单次 PowerShell 会话中设置 Electron 文档
 
 ```powershell
 $env:ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/'
-.\生成安装包.bat --no-pause
+.\构建编辑器.bat --no-pause
 ```
 
 ## 工作区
@@ -248,7 +248,7 @@ npm.cmd run test:packaged
 
 2026-11-07 核对：TypeScript 与生产构建通过，39 项非 UI 测试通过，207 个资产通过真实 Lua 加载器校验；开发版及打包版 UI 测试覆盖统一输入列表、十二通道、图标中心位置、中英文跨窗口同步、语言持久化与草稿不变。框架原生回归为 496 项中 495 项通过，剩余为已记录的 Idle 中键回正接线问题。
 
-发布统一覆盖原有 `release/` 目录，不另建按日期命名的发布目录。运行 `npm run package:installer` 或 `生成安装包.bat`，安装包生成于 `release/CameraFrameworkEditor-0.6.0-Setup.exe`。如果文件被运行中的编辑器占用，先正常关闭该编辑器再重试，避免丢失未保存的草稿。默认使用 `npm run test:packaged` 验证 `release/win-unpacked` 中的程序。
+发布统一覆盖原有 `release/` 目录，不另建按日期命名的发布目录。运行 `npm run package:installer` 或 `构建编辑器.bat`，安装包生成于 `release/CameraFrameworkEditor-0.6.0-Setup.exe`。如果文件被运行中的编辑器占用，先正常关闭该编辑器再重试，避免丢失未保存的草稿。默认使用 `npm run test:packaged` 验证 `release/win-unpacked` 中的程序。
 
 ### 可玩试验场验证（2026-11-07）
 

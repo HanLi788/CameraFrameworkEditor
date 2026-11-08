@@ -1,7 +1,7 @@
 @echo off
 setlocal
 chcp 65001 >nul
-title Camera Framework Editor - Build Installer
+title Camera Framework Editor - Build Editor
 pushd "%~dp0"
 if errorlevel 1 exit /b 1
 set "BUILD_EXIT=1"
@@ -40,7 +40,10 @@ if errorlevel 1 goto failed
 if not exist "release\CameraFrameworkEditor-%EDITOR_VERSION%-Setup.exe" goto failed
 set "BUILD_EXIT=0"
 echo.
-echo SUCCESS - Installer output:
+echo SUCCESS - Editor output:
+echo "%CD%\release\win-unpacked\相机框架编辑器.exe"
+echo.
+echo Installer output:
 echo "%CD%\release\CameraFrameworkEditor-%EDITOR_VERSION%-Setup.exe"
 goto done
 :missing_node
