@@ -5,14 +5,40 @@ const path=require('node:path');
 const os=require('node:os');
 const {Project,encode,json,references,cleanRelative}=require('../electron/project.cjs');
 let temp,project;
-const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';
-before(async()=>{temp=await fs.mkdtemp(path.join(os.tmpdir(),'camera-editor-test-'));const base=path.join(temp,'中文工作区');await fs.mkdir(base);await fs.cp(source,path.join(base,'CameraFramework'),{recursive:true});await fs.cp(path.join(path.dirname(source),'Foundation'),path.join(base,'Foundation'),{recursive:true});project=await Project.open(path.join(base,'CameraFramework'),path.join(temp,'data'),path.resolve('runtime/lua54.exe'));});
+const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'D:/MyWorks/Lua/CameraFramework';
+before(async()=>{temp=await fs.mkdtemp(path.join(os.tmpdir(),'camera-editor-test-'));const base=path.join(temp,'中文工作区');await fs.mkdir(base);await fs.cp(source,path.join(base,'CameraFramework'),{recursive:true});await fs.cp(path.join(path.dirname(source),'Foundation'),path.join(base,'Foundation'),{recursive:true});await fs.cp(path.join(path.dirname(source),'InputSystem'),path.join(base,'InputSystem'),{recursive:true});for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor','Player',name+'.lua'),path.join(base,'Actor','Player',name+'.lua'));project=await Project.open(path.join(base,'CameraFramework'),path.join(temp,'data'),path.resolve('runtime/lua54.exe'));});
 after(()=>console.log('Test fixture retained for inspection:',temp));
-test('loads the current path assets and validates all assets through real Lua, with Unicode project paths',async()=>{const s=await project.snapshot();assert.equal(s.assets.length,207);assert.equal(s.issues.length,0);const r=await project.validate();assert.equal(r.runtime,true);assert.equal(r.checked,207);assert.deepEqual(r.issues,[]);});
+
+test('typed creation locks extensions; folder moves rewrite references and preserve text files',async()=>{
+ const mutate=async request=>project.mutate({...request,snapshotRevision:(await project.snapshot()).snapshotRevision});
+ const template=(await project.snapshot()).assets.find(a=>a.type==='Smooth');
+ await mutate({kind:'create-directory',path:'Assets/WorkbenchFixture'});
+ await mutate({kind:'create-asset',type:'Smooth',sourcePath:template.path,path:'Assets/WorkbenchFixture/Test.smooth'});
+ await fs.writeFile(path.join(project.root,'Assets/WorkbenchFixture/notes.md'),'notes');
+ const p='Assets/WorkbenchFixture/Test.smooth';
+ const sourceRevision=(await project.read(p)).revision;
+ await assert.rejects(()=>mutate({kind:'move',sourcePath:p,path:'Assets/WorkbenchFixture/Test.input',sourceRevision}),/后缀/);
+ const rig=structuredClone((await project.snapshot()).assets.find(a=>a.type==='Rig').data);rig.Processors.Smooth=[p];await project.atomic('Assets/WorkbenchOwner.rig',encode(rig));
+ const result=await mutate({kind:'move',sourcePath:'Assets/WorkbenchFixture',path:'Assets/RenamedFixture'});assert.equal(result.moves[p],'Assets/RenamedFixture/Test.smooth');assert.equal((await project.read('Assets/RenamedFixture/notes.md')).text,'notes');
+ assert.deepEqual(json((await project.read('Assets/WorkbenchOwner.rig')).text).Processors.Smooth,['Assets/RenamedFixture/Test.smooth']);
+ await assert.rejects(()=>mutate({kind:'delete',sourcePath:'Assets/RenamedFixture'}),/引用/);
+ await mutate({kind:'copy',sourcePath:'Assets/RenamedFixture',path:'Assets/CopyFixture'});assert.equal((await project.read('Assets/CopyFixture/notes.md')).text,'notes');
+ const md=await project.read('Assets/CopyFixture/notes.md');await assert.rejects(()=>mutate({kind:'move',sourcePath:md.path,sourceRevision:md.revision,path:'Assets/CopyFixture/notes.lua'}),/后缀/);
+ await mutate({kind:'delete',sourcePath:'Assets/WorkbenchOwner.rig',sourceRevision:(await project.read('Assets/WorkbenchOwner.rig')).revision});await mutate({kind:'delete',sourcePath:'Assets/RenamedFixture'});await mutate({kind:'delete',sourcePath:'Assets/CopyFixture'});
+});
+test('loads the current path assets and validates all assets through real Lua, with Unicode project paths',async()=>{const s=await project.snapshot();assert.equal(s.assets.length,212);assert.equal(s.issues.length,0);const r=await project.validate();assert.equal(r.runtime,true);assert.equal(r.checked,212);assert.deepEqual(r.issues,[]);});
+
+test('failed folder move restores files and empty directories without leaving a target tree',async()=>{
+ await fs.mkdir(path.join(project.root,'Assets/MoveRollback/Empty'),{recursive:true});await fs.writeFile(path.join(project.root,'Assets/MoveRollback/a.md'),'original a');await fs.writeFile(path.join(project.root,'Assets/MoveRollback/b.md'),'original b');
+ const atomic=project.atomic;project.atomic=async function(p,text){if(p==='Assets/MoveTarget/b.md')throw Error('injected folder write failure');return atomic.call(this,p,text);};
+ try{await assert.rejects(()=>project.mutate({kind:'move',sourcePath:'Assets/MoveRollback',path:'Assets/MoveTarget',snapshotRevision:''}).then(()=>{}),/变化/);await assert.rejects(()=>project.snapshot().then(s=>project.mutate({kind:'move',sourcePath:'Assets/MoveRollback',path:'Assets/MoveTarget',snapshotRevision:s.snapshotRevision})),/injected folder/);}finally{project.atomic=atomic;}
+ assert.equal((await project.read('Assets/MoveRollback/a.md')).text,'original a');assert.equal((await project.read('Assets/MoveRollback/b.md')).text,'original b');assert.ok((await fs.stat(path.join(project.root,'Assets/MoveRollback/Empty'))).isDirectory());assert.equal(await fs.stat(path.join(project.root,'Assets/MoveTarget')).catch(()=>null),null);
+ await project.mutate({kind:'delete',sourcePath:'Assets/MoveRollback',snapshotRevision:(await project.snapshot()).snapshotRevision});
+});
 
 test('unified input mounts reject duplicate phases and accept an empty list without lifecycle references',async()=>{
   const p='Assets/CameraAssets/ActionCamera/Player/Dash/Dash.rig',doc=await project.read(p),data=json(doc.text);
-  assert.equal(data.SchemaVersion,14);assert.deepEqual(Object.keys(data.Processors.Input),['Assets','SensitivityAssets']);
+  assert.equal(data.SchemaVersion,15);assert.deepEqual(Object.keys(data.Processors.Input),['Assets']);
   data.Processors.Input.Assets.push('Assets/CameraAssets/ActionCamera/Player/Run/InputAssets/Run_Enter.input');
   assert.ok((await project.validate({[p]:encode(data)})).issues.some(i=>i.severity==='error'&&i.message.includes('Enter')));
   data.Processors.Input.Assets=[];assert.deepEqual((await project.validate({[p]:encode(data)})).issues,[]);
@@ -21,13 +47,13 @@ test('unified input mounts reject duplicate phases and accept an empty list with
 
 test('user input assets require twelve explicit channels, including disabled channels',async()=>{
   const p='Assets/CameraAssets/ActionCamera/Player/Dash/InputAssets/Dash_User.input',doc=await project.read(p),data=json(doc.text);
-  assert.equal(data.SchemaVersion,3);assert.equal(Object.keys(data.Channels).length,12);assert.equal(data.Channels.Roll.bEnabled,false);
+  assert.equal(data.SchemaVersion,5);assert.equal(Object.keys(data.Channels).length,12);assert.equal(data.Channels.Roll.bEnabled,false);
   delete data.Channels.Roll;assert.ok((await project.validate({[p]:encode(data)})).issues.some(i=>i.severity==='error'));
   assert.equal((await project.read(p)).text,doc.text);
 });
 test('rejects traversal, reserved paths and invalid segments',async()=>{for(const p of ['../outside','Assets/../x','C:/x','Assets//x','Assets/NUL.rig','Assets/x.','Assets/a\\b'])assert.throws(()=>cleanRelative(p));await assert.rejects(()=>project.read('../outside'));});
 test('validates unsaved drafts without writing and rejects invalid range values',async()=>{const s=await project.snapshot();const a=s.assets.find(a=>a.type==='Range');const before=await project.read(a.path);const data=JSON.parse(before.text);data.Channels.Dist.Min=99999;data.Channels.Dist.Max=-1;const result=await project.validate({[a.path]:encode(data)});assert.ok(result.issues.some(i=>i.severity==='error'));assert.equal((await project.read(a.path)).text,before.text);});
-test('detects duplicate JSON fields using the runtime decoder',async()=>{const a=(await project.snapshot()).assets.find(a=>a.type==='Occlusion');const before=await project.read(a.path);const text=before.text.replace('"SchemaVersion": 4','"SchemaVersion": 4, "SchemaVersion": 4');const result=await project.validate({[a.path]:text});assert.ok(result.issues.length>0);});
+test('detects duplicate JSON fields using the runtime decoder',async()=>{const a=(await project.snapshot()).assets.find(a=>a.type==='Occlusion');const before=await project.read(a.path);const text=before.text.replace(/"SchemaVersion"\s*:\s*\d+/,match=>match+', '+match);const result=await project.validate({[a.path]:text});assert.ok(result.issues.length>0);});
 test('saves a valid edit with recovery copy, rejects stale writes, then restores',async()=>{const a=(await project.snapshot()).assets.find(a=>a.type==='Effect');const before=await project.read(a.path);const data=JSON.parse(before.text);data.Description+=' editor test';const saved=await project.save({path:a.path,text:encode(data),revision:before.revision});assert.equal(saved.text,encode(data));assert.ok(await fs.stat(saved.backup));await assert.rejects(()=>project.save({path:a.path,text:before.text,revision:before.revision}),/外部修改/);await project.save({path:a.path,text:before.text,revision:saved.revision});});
 test('prevents saving incompatible curves referenced by transition assets',async()=>{const a=(await project.snapshot()).assets.find(a=>a.path==='Assets/CurveAssets/Bezier/Linear.curve');const before=await project.read(a.path);const data=JSON.parse(before.text);data.P4.Y=0;await assert.rejects(()=>project.save({path:a.path,text:encode(data),revision:before.revision}));assert.equal((await project.read(a.path)).text,before.text);});
 test('copy, move and delete use paths anywhere inside the framework without an index',async()=>{
@@ -39,7 +65,7 @@ test('copy, move and delete use paths anywhere inside the framework without an i
   snap=await project.snapshot();assert.ok(snap.assets.some(a=>a.path===second));assert.equal(JSON.parse((await project.read(second)).text).Id,undefined);
   assert.equal(await fs.stat(path.join(project.root,first)).catch(()=>null),null);
   await project.mutate({kind:'delete',sourcePath:second,snapshotRevision:snap.snapshotRevision,sourceRevision:(await project.read(second)).revision});
-  assert.equal((await project.snapshot()).assets.length,207);
+  assert.equal((await project.snapshot()).assets.length,212);
   assert.equal(await fs.stat(path.join(project.root,'Assets/Index.json')).catch(()=>null),null);
 });
 test('rejects deletion of referenced assets and stale asset mutations',async()=>{
@@ -77,15 +103,16 @@ test('reference discovery ignores ordinary strings and keeps scalar dependency t
   const refs=references({Source:{Object:'Owner',Interface:'Query',Params:['Assets/fake.curve']},Description:'Assets/fake.curve',RangeAsset:'Assets/a.range',Channels:{Dist:{Curve:'Assets/b.curve'}},ValueAssets:[{Id:10001,Path:'Assets/c.value'}]});
   assert.deepEqual(refs.map(r=>r.type),['Range','Curve','Value']);
 });
-test('new rig keeps its filename at scene level and reserves effect/pipeline folders',async()=>{
+test('new rig keeps its filename at scene level and reserves only the pipeline folder',async()=>{
   let snap=await project.snapshot();const rig=snap.assets.find(a=>a.path.endsWith('/Dash/Dash.rig')),dest='Custom/NewScene/NewScene.rig';
   await project.mutate({kind:'copy',sourcePath:rig.path,path:dest,snapshotRevision:snap.snapshotRevision});
-  for(const folder of ['EffectAssets','PipelineAssets'])assert.ok(await fs.stat(path.join(project.root,'Custom/NewScene',folder,'.gitkeep')));
+  assert.ok(await fs.stat(path.join(project.root,'Custom/NewScene/PipelineAssets/.gitkeep')));
+  await assert.rejects(fs.stat(path.join(project.root,'Custom/NewScene/EffectAssets')),{code:'ENOENT'});
   snap=await project.snapshot();await project.mutate({kind:'delete',sourcePath:dest,snapshotRevision:snap.snapshotRevision,sourceRevision:(await project.read(dest)).revision});
 });
 test('invalid dynamic source descriptions and non-scalar arguments fail save validation',async()=>{
   const a=(await project.snapshot()).assets.find(a=>a.type==='Effect'),doc=await project.read(a.path),original=JSON.parse(doc.text);
-  for(const change of [d=>d.Source.Object='Owner:GetSomething()',d=>d.Source.Interface='Get.Value',d=>d.Source.Params=[null],d=>d.Source.Params={Axis:'X'},d=>d.Source.Params=[{}],d=>delete d.Source.bMemberFunction]) {
+  for(const change of [d=>d.Source.Object='Owner:GetSomething()',d=>d.Source.Interface='Get.Value',d=>d.Source.Params=[null],d=>d.Source.Params={Axis:'X'},d=>d.Source.Params=[{}],d=>d.Source.bMemberFunction=true]) {
     const data=structuredClone(original);change(data);await assert.rejects(()=>project.save({...doc,text:encode(data)}));
   }
   assert.equal((await project.read(doc.path)).text,doc.text);
@@ -119,4 +146,10 @@ test('creates empty asset folders without rewriting assets and rejects collision
   for(const target of [directory,'Outside','Assets/../Outside','Assets/NUL','Assets/NoParent/Child',before.assets[0].path]) {
     await assert.rejects(()=>project.mutate({kind:'create-directory',path:target,snapshotRevision:after.snapshotRevision}));
   }
+});
+
+test('workspace root selects all Lua dependencies and missing InputSystem fails clearly',async()=>{
+ const opened=await Project.open(project.workspaceRoot,project.storage,project.runtime);assert.equal(opened.root,project.root);assert.equal((await opened.snapshot()).workspaceRoot,project.workspaceRoot);
+ const file=path.join(project.workspaceRoot,'InputSystem/InputManager.lua'),held=file+'.test-backup';await fs.rename(file,held);
+ try{await assert.rejects(()=>Project.open(project.workspaceRoot,project.storage,project.runtime),/InputSystem/);}finally{await fs.rename(held,file);}
 });

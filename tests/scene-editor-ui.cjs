@@ -1,0 +1,49 @@
+const {_electron:electron}=require('playwright'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
+(async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-gameplay-scene-ui-')),source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'D:/MyWorks/Lua/CameraFramework';
+ for(const name of ['CameraFramework','Foundation','InputSystem'])await fs.cp(path.join(path.dirname(source),name),path.join(dir,name),{recursive:true});
+ for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor/Player',name+'.lua'),path.join(dir,'Actor/Player',name+'.lua'));
+ const data=path.join(dir,'data');await fs.mkdir(data);await fs.writeFile(path.join(data,'settings.json'),JSON.stringify({recent:[dir]}));
+ const env={...process.env,CAMERA_EDITOR_TEST_DATA:data};delete env.ELECTRON_RUN_AS_NODE;
+ const app=await electron.launch(process.argv.includes('--packaged')?{executablePath:path.resolve('release/win-unpacked/相机框架编辑器.exe'),env}:{args:[path.resolve('.')],env});
+ const main=await app.firstWindow(),errors=[];let game;
+ const watch=p=>{p.setDefaultTimeout(30000);p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error'&&/shader|WebGL/i.test(m.text()))errors.push(m.text());});};watch(main);app.on('window',watch);
+ const until=async fn=>{const end=Date.now()+30000;while(!await fn()){if(Date.now()>end)throw Error('State did not settle');await new Promise(r=>setTimeout(r,50));}};
+ const state=()=>main.evaluate(()=>window.cameraEditor.bootstrap()),frame=async()=>(await state()).simulation.frame;
+ try{
+  await main.locator('.recent button').click();await main.locator('.workbench-body').waitFor();
+  await main.evaluate(async()=>{const api=window.cameraEditor,post='Assets/PostProcessingAssets/OwnerVelocity/MovementSpeed.postProcessing',s=await api.ensure(post),d=s.docs.find(d=>d.path===post),v=JSON.parse(d.text);v.Domain='[0,1000]';v.Outputs={ExposureCompensation:{Range:'{1.25}'}};await api.editText({path:post,baseText:d.text,text:JSON.stringify(v)});const b=await api.postBindings();b.config.Bindings[0].Activation={Kind:'Always'};await api.postBindings({baseText:b.text,config:b.config});});
+  const opened=app.waitForEvent('window');await main.getByRole('button',{name:'打开游戏窗口',exact:true}).click();game=await opened;await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('game=1')).setSize(1480,960));
+
+  assert.equal(await game.getByRole('button',{name:'场景编辑',exact:true}).count(),0);
+  await game.getByRole('button',{name:'开始游戏',exact:true}).click();await until(async()=>(await state()).simulation.status==='running');
+  const values=async()=>JSON.parse(await game.locator('.canvas-host').getAttribute('data-post-values')),pose=async()=>JSON.parse(await game.locator('.canvas-host').getAttribute('data-observer-position'));
+  const directory=game.locator('.scene-directory'),canvas=game.locator('.canvas-host'),inspector=game.locator('.scene-inspector');
+  const beforeSession=JSON.stringify((await state()).session.docs),postPath=path.join(dir,'CameraFramework/Assets/PostProcessingAssets/OwnerVelocity/MovementSpeed.postProcessing'),beforeFile=await fs.readFile(postPath,'utf8');
+  await game.getByRole('button',{name:'暂停游戏',exact:true}).click();await until(async()=>(await state()).simulation.status==='paused');await game.waitForTimeout(100);const beforePose=await pose(),beforeFrame=await frame();
+  await game.getByRole('button',{name:'后处理调试',exact:true}).click();await game.locator('.post-debug-layout').waitFor();await game.waitForTimeout(100);
+  assert.equal((await state()).simulation.status,'paused');assert.deepEqual(await pose(),beforePose);assert.deepEqual((await frame()).location,beforeFrame.location);
+  assert.equal(await game.locator('.scene-placement').count(),0);assert.equal(await game.getByRole('button',{name:'保存世界',exact:true}).count(),0);assert.equal(await directory.getByRole('treeitem',{name:/NPC/}).count(),0);
+  const catalog=(await state()).project.effectCatalog.postProcessing,groups=[...new Set(catalog.map(c=>c.group))];assert.equal(await directory.getByRole('treeitem').count(),groups.length);
+  const exposure=inspector.locator('[data-channel="ExposureCompensation"]');await exposure.waitFor();assert.equal(await exposure.locator('input[type=range]').count(),1);assert.equal(await exposure.getByLabel('ExposureCompensation.Value',{exact:true}).inputValue(),'1.25');
+  await exposure.getByLabel('ExposureCompensation.Value',{exact:true}).fill('2.5');await until(async()=>(await values()).ExposureCompensation===2.5);assert.equal((await frame()).postProcessing.ExposureCompensation,1.25);
+  await game.getByRole('button',{name:'继续游戏',exact:true}).click();await until(async()=>(await state()).simulation.status==='running');const time=(await frame()).time;await until(async()=>(await frame()).time>time+.2);assert.equal((await values()).ExposureCompensation,2.5);
+  await exposure.getByLabel('ExposureCompensation.Value',{exact:true}).fill('NaN');assert.equal(await exposure.getByLabel('ExposureCompensation.Value',{exact:true}).getAttribute('aria-invalid'),'true');assert.equal((await values()).ExposureCompensation,2.5);
+  await exposure.getByRole('button',{name:'恢复参数 ExposureCompensation',exact:true}).click();await until(async()=>(await values()).ExposureCompensation===1.25);assert.equal(await exposure.getByLabel('ExposureCompensation.Value',{exact:true}).inputValue(),'1.25');
+  const slider=exposure.getByLabel('ExposureCompensation.Slider',{exact:true});await slider.focus();await slider.press('Home');await until(async()=>(await values()).ExposureCompensation===Number(await slider.getAttribute('min')));assert.equal(await exposure.getAttribute('data-overridden'),'true');
+  await directory.getByRole('treeitem',{name:'暗角',exact:true}).click();await inspector.getByLabel('VignetteIntensity.Value',{exact:true}).fill('0.8');await until(async()=>(await values()).VignetteIntensity===.8);
+  const control=inspector.getByLabel('VignetteIntensity.Value',{exact:true});const stationary=(await frame()).owner;await control.press('KeyW');await game.waitForTimeout(150);{const current=await frame();assert.ok(['X','Y','Z'].every(k=>Math.abs(current.owner[k]-stationary[k])<.01));};
+  await inspector.getByRole('button',{name:'恢复全部参数',exact:true}).click();await until(async()=>(await values()).ExposureCompensation===1.25&&!Object.hasOwn(await values(),'VignetteIntensity'));
+  await game.getByLabel('游戏视口',{exact:true}).focus();const position=(await frame()).owner;await game.keyboard.down('d');await until(async()=>(await frame()).owner.Y>position.Y+20);await directory.getByRole('treeitem',{name:'曝光',exact:true}).click();await game.keyboard.up('d');await until(async()=>(await frame()).speed<1);const stopped=(await frame()).owner;await inspector.getByLabel('搜索后处理参数',{exact:true}).fill('w');await game.waitForTimeout(150);{const current=await frame();assert.ok(['X','Y','Z'].every(k=>Math.abs(current.owner[k]-stopped[k])<.01));};await inspector.getByLabel('搜索后处理参数',{exact:true}).fill('');
+  await exposure.getByLabel('ExposureCompensation.Value',{exact:true}).fill('3');await until(async()=>(await values()).ExposureCompensation===3);await game.screenshot({path:'test-results/post-debug.png'});
+  await game.getByRole('button',{name:'退出后处理调试',exact:true}).click();await until(async()=>(await values()).ExposureCompensation===1.25);assert.equal((await state()).simulation.status,'running');
+  await game.getByRole('button',{name:'后处理调试',exact:true}).click();assert.equal(await exposure.getAttribute('data-overridden'),'false');await game.getByLabel('游戏视口',{exact:true}).focus();await game.keyboard.press('F8');await until(async()=>await game.locator('.post-debug-layout').count()===0);await game.keyboard.press('F8');await game.locator('.post-debug-layout').waitFor();
+  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('game=1')).setSize(900,680));await game.waitForTimeout(200);assert.equal(await game.locator('.scene-layout').evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);assert.equal(await inspector.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);await game.screenshot({path:'test-results/post-debug-small.png'});
+  await app.evaluate(({Menu})=>Menu.getApplicationMenu().items.find(i=>i.label==='语言').submenu.items.find(i=>i.label==='English').click());await game.getByRole('button',{name:'Exit postprocessing debug',exact:true}).waitFor();assert.ok((await inspector.innerText()).includes('Exposure Compensation'));assert.ok((await directory.innerText()).includes('Exposure'));
+  await exposure.getByLabel('ExposureCompensation.Value',{exact:true}).fill('4');await game.getByRole('button',{name:'Return to main menu',exact:true}).click();await game.getByRole('button',{name:'Play',exact:true}).waitFor();
+  await game.getByRole('button',{name:'Play',exact:true}).click();await until(async()=>(await state()).simulation.status==='running');await until(async()=>(await values()).ExposureCompensation===1.25);assert.equal(await game.locator('[data-post-debug=true]').count(),0);
+  assert.equal(await fs.readFile(postPath,'utf8'),beforeFile);assert.equal(JSON.stringify((await state()).session.docs),beforeSession);assert.deepEqual(errors,[]);
+  console.log('Postprocessing debug UI passed: current camera, grouped catalogue, sliders/numbers, override isolation/restoration, input focus, running/paused, restart, small layout and English. Fixture:',dir);
+ }catch(e){await game?.screenshot({path:'test-results/post-debug-failure.png'}).catch(()=>{});throw e;}
+ finally{await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});}
+})().catch(e=>{console.error(e);process.exitCode=1;});

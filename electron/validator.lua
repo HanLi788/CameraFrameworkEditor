@@ -32,8 +32,8 @@ package.loaded['Foundation.Adaptation.UEMath']={GetForwardVector=function(r)
     return require('Foundation.Math.Vector3D').New(math.cos(p)*math.cos(y),math.cos(p)*math.sin(y),math.sin(p))
 end}
 package.loaded['Foundation.Adaptation.SluaAPI']={}
-package.loaded['CameraFramework.Adaptation.UECamera']={}
-package.loaded['CameraFramework.AssetLoading.AssetPaths']={GetRootDirectory=function() return '__editor__' end}
+package.loaded['CameraFramework.CameraSystem.Adaptation.UECamera']={}
+package.loaded['CameraFramework.Shared.AssetLoading.AssetPaths']={GetRootDirectory=function() return '__editor__' end}
 local function quote(s)
     return '"'..tostring(s):gsub('[%z\1-\31\\"]',function(c)
         local m={['"']='\\"',['\\']='\\\\',['\n']='\\n',['\r']='\\r',['\t']='\\t'}
@@ -42,22 +42,28 @@ local function quote(s)
 end
 local issues={};local checked=0
 local ok,err=pcall(function()
-    local map={Value='Values',Range='Ranges',Smooth='Smoothing',Sensitivity='Sensitivity',Input='Inputs',Effect='Effects',Occlusion='Occlusion',Pipeline='Pipeline'}
+    local map={Value='CameraSystem.Values',Range='CameraSystem.Ranges',Smooth='CameraSystem.Smoothing',Sensitivity='CameraSystem.Sensitivity',Input='CameraSystem.Inputs',Effect='CameraSystem.Effects',PostProcessing='PostProcessing',Occlusion='CameraSystem.Occlusion',Pipeline='CameraSystem.Pipeline'}
     for _,entry in ipairs(bundle.assets) do
         local file=entry.path
         local valid,message=pcall(function()
-            if entry.type=='Curve' then require('CameraFramework.Curves.CurveLibrary').GetDefault():Resolve(file)
+            if entry.type=='Curve' then require('CameraFramework.Shared.Curves.CurveLibrary').GetDefault():Resolve(file)
             elseif entry.type=='Rig' then
                 local raw=Json.Decode(bundle.files['__editor__/'..file])
-                local pipeline=require('CameraFramework.Pipeline.AssetLibrary').GetDefault():Get(assert(raw.Pipelines[1],'装置缺少管线'))
+                local pipeline=require('CameraFramework.CameraSystem.Pipeline.AssetLibrary').GetDefault():Get(assert(raw.Pipelines[1],'装置缺少管线'))
                 local space=assert(({Action='ActionCamera',Idle='IdleCamera',Battle='BattleCamera',Interactive='InteractiveCamera'})[pipeline.SpaceType],'Unknown space type')
-                local prefix='CameraFramework.CameraSpaces.'..space
+                local prefix='CameraFramework.CameraSystem.CameraSpaces.'..space
                 local validator=require(prefix..(space=='IdleCamera' and '.Definition.Validator' or '.Rig.Definition.Validator'))
-                require('CameraFramework.AssetLoading.DefinitionLoader').Load('__editor__/'..file,validator.Validate,require(prefix..'.PipelineRules').Environment(),file)
+                require('CameraFramework.CameraSystem.AssetLoading.DefinitionLoader').Load('__editor__/'..file,validator.Validate,require(prefix..'.PipelineRules').Environment(),file)
             else require('CameraFramework.'..assert(map[entry.type])..'.AssetLibrary').GetDefault():Get(file) end
         end)
         if valid then checked=checked+1 else issues[#issues+1]='{"path":'..quote(file)..',"severity":"error","message":'..quote(message)..'}' end
     end
 end)
+local planText
+if ok and #issues==0 then
+    ok,err=pcall(function()
+        planText=require('CameraFramework.PostProcessing.Compiler').Compile(require('CameraFramework.PostProcessing.Bindings'),'__editor__')
+    end)
+end
 if not ok then issues[#issues+1]='{"path":"","severity":"error","message":'..quote(err)..'}' end
-io.write('EDITOR_RESULT:{"checked":'..checked..',"issues":['..table.concat(issues,',')..']}\n')
+io.write('EDITOR_RESULT:{"checked":'..checked..',"issues":['..table.concat(issues,',')..'],"planText":'..(planText and quote(planText) or 'null')..'}\n')

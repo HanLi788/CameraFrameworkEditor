@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=r
 const {Project,encode}=require('../electron/project.cjs');
 const {Simulation}=require('../electron/simulation.cjs');
 let project,snapshot;
-before(async()=>{const temp=await fs.mkdtemp(path.join(os.tmpdir(),'camera-simulation-'));const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';await fs.cp(source,path.join(temp,'CameraFramework'),{recursive:true});await fs.cp(path.join(path.dirname(source),'Foundation'),path.join(temp,'Foundation'),{recursive:true});await fs.cp(path.join(path.dirname(source),'Actor','Player','MovementValues.lua'),path.join(temp,'Actor','Player','MovementValues.lua'));project=await Project.open(path.join(temp,'CameraFramework'),path.join(temp,'data'),path.resolve('runtime/lua54.exe'));snapshot=await project.snapshot();});
+before(async()=>{const temp=await fs.mkdtemp(path.join(os.tmpdir(),'camera-simulation-'));const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'D:/MyWorks/Lua/CameraFramework';await fs.cp(source,path.join(temp,'CameraFramework'),{recursive:true});await fs.cp(path.join(path.dirname(source),'Foundation'),path.join(temp,'Foundation'),{recursive:true});await fs.cp(path.join(path.dirname(source),'InputSystem'),path.join(temp,'InputSystem'),{recursive:true});for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor','Player',name+'.lua'),path.join(temp,'Actor','Player',name+'.lua'));await fs.cp(path.join(path.dirname(source),'Actor','Player','MovementValues.lua'),path.join(temp,'Actor','Player','MovementValues.lua'));project=await Project.open(path.join(temp,'CameraFramework'),path.join(temp,'data'),path.resolve('runtime/lua54.exe'));snapshot=await project.snapshot();});
 test('real framework initializes all 12 channels from idle and executes enter, two-second hold and exit',async()=>{
   const sim=new Simulation();try{
     await sim.start(project,{}, {rigPath:'Assets/CameraAssets/InteractiveCamera/Player/Dialogue/Dialogue.rig'},false);
@@ -35,18 +35,25 @@ test('stopping while preparing cancels activation and leaves no timer or child',
 test('preview collision drives the real occlusion stage while respecting configured minimum distance',async()=>{
   const range=snapshot.assets.find(a=>a.path==='Assets/CameraAssets/IdleCamera/Player/Default/RangeAssets/Default_Default.range'),data=structuredClone(range.data);data.Channels.Dist.Min=100;const sim=new Simulation();try{
     await sim.start(project,{[range.path]:encode(data)},{rigPath:'Assets/CameraAssets/IdleCamera/Player/Default/Default.rig',obstacle:true},false);await sim.step(120);assert.ok(Math.abs(sim.frame.target.Dist-130)<.01);assert.ok(sim.frame.output.Dist>=100);assert.ok(sim.frame.output.Dist<140);
-    data.Channels.Dist.Min=200;await sim.start(project,{[range.path]:encode(data)},{rigPath:'Assets/CameraAssets/IdleCamera/Player/Default/Default.rig',obstacle:true},false);await sim.step(120);assert.equal(sim.frame.target.Dist,200);
+    data.Channels.Dist.Min=200;await sim.start(project,{[range.path]:encode(data)},{rigPath:'Assets/CameraAssets/IdleCamera/Player/Default/Default.rig',obstacle:true},false);await sim.step(120);assert.equal(sim.frame.target.Dist,400);assert.ok(sim.frame.obstacleOpacity<1);
+    const occlusion=snapshot.assets.find(a=>a.path.endsWith('/Default/OcclusionAssets/Default_Default.occlusion'));
+    const fade={...occlusion.data,Mode:'Fade'};data.Channels.Dist.Min=100;
+    await sim.start(project,{[range.path]:encode(data),[occlusion.path]:encode(fade)},{rigPath:'Assets/CameraAssets/IdleCamera/Player/Default/Default.rig',obstacle:true},false);await sim.step(120);assert.equal(sim.frame.target.Dist,400);assert.ok(sim.frame.obstacleOpacity<1);
   }finally{sim.stop();}
 });
 
 test('effect preview calls project business methods and reports missing or nonnumeric interfaces',async()=>{
-  const rig=snapshot.assets.find(a=>a.path.endsWith('/Run/Run.rig')),effect=snapshot.assets.find(a=>a.path.endsWith('/EffectAssets/Run_MovementSpeed.effect'));
+  const rig=snapshot.assets.find(a=>a.path.endsWith('/Run/Run.rig')),effect=snapshot.assets.find(a=>a.path.endsWith('/EffectAssets/OwnerVelocity/MovementSpeed.effect'));
   const data=structuredClone(rig.data);data.Processors.Effects=[effect.path];
   const sim=new Simulation();try {
     await sim.start(project,{[rig.path]:encode(data)},{rigPath:rig.path,speed:2400},false);await sim.step(100);const boosted=sim.frame.target.FOV;
     await sim.start(project,{}, {rigPath:rig.path,speed:2400},false);await sim.step(100);assert.ok(boosted>sim.frame.target.FOV);
     const bad=structuredClone(effect.data);bad.Source.Interface='MissingQuery';
     await assert.rejects(()=>sim.start(project,{[rig.path]:encode(data),[effect.path]:encode(bad)},{rigPath:rig.path},false),/MissingQuery/);
+    // Register a real method that returns a vector, so this still exercises
+    // runtime return validation rather than the unregistered-name guard.
+    const registry=path.join(project.root,'CameraSystem/Effects/InterfaceRegistry.lua'),registryText=await fs.readFile(registry,'utf8');
+    await fs.writeFile(registry,registryText.replace('GetSpeedValue = {','GetVelocity = {bMemberFunction=true,ReturnType="number",Params={}},\n        GetSpeedValue = {'));
     bad.Source.Interface='GetVelocity';bad.Source.Params=[];
     await assert.rejects(async()=>{await sim.start(project,{[rig.path]:encode(data),[effect.path]:encode(bad)},{rigPath:rig.path},false);await sim.step(1);},/number|数字|有限/);
   }finally{sim.stop();}

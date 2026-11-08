@@ -1,5 +1,45 @@
 import type {ButtonHTMLAttributes} from 'react';
 const shapes:Record<string,string>={
+  'scene-npc':'M8 2h8v7H8Z M5 11h14v8h-4v3h-3v-7h-1v7H8v-3H5Z',
+  'post-focus':'M3 8V3h5 M16 3h5v5 M21 16v5h-5 M8 21H3v-5 M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+  'post-sun':'M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2',
+  'post-bloom':'M12 2l2 7 7 3-7 2-2 8-2-8-8-2 8-3Z M4 3l2 2 M18 19l2 2 M19 4l-2 2',
+  'post-vignette':'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0 M3 8l3 1 M18 15l3 1 M8 3l1 3 M15 18l1 3',
+  'post-palette':'M21 11C21 5 17 2 11 2a10 10 0 0 0 0 20c4 0 2-4 5-5h2c2 0 3-2 3-6Z M7 8h.1 M12 6h.1 M17 9h.1 M6 13h.1',
+  'post-film':'M3 3h18v18H3Z M7 3v18 M17 3v18 M3 8h4 M3 16h4 M17 8h4 M17 16h4 M7 12h10',
+  'post-prism':'M12 3L4 19h16Z M2 9l7 3 M15 10l7-4 M16 13h6 M18 16l4 4',
+  'post-globe':'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0 M2 12h20 M12 2c-6 5-6 15 0 20 6-5 6-15 0-20 M5 5c4 4 10 4 14 0',
+  'post-lumen':'M5 15l7-12 7 12H5Z M12 8v13 M3 19h5 M16 19h5 M5 10l-3-3 M19 10l3-3',
+  'post-reflection':'M2 12h20 M5 9l5-6 5 6Z M5 15l5 6 5-6 M19 4v4 M17 6h4',
+  'post-cube':'M12 2L3 7v10l9 5 9-5V7Z M3 7l9 5 9-5 M12 12v10 M7 5l9 5',
+  'post-local':'M3 8V3h5 M16 3h5v5 M21 16v5h-5 M8 21H3v-5 M12 7v10 M12 7a5 5 0 1 1 0 10Z',
+  'post-flare':'M12 2v20 M2 12h20 M5 5l14 14 M5 19L19 5 M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
+  'post-image':'M3 3h18v18H3Z M3 17l6-7 5 6 3-3 4 4 M16 7h.1',
+  'post-grain':'M3 3h18v18H3Z M7 7h.1 M12 6h.1 M17 8h.1 M6 12h.1 M11 11h.1 M16 13h.1 M8 17h.1 M13 16h.1 M18 18h.1',
+  'post-ao':'M3 3v18h18 M8 4v12h12 M12 9a5 5 0 1 1 0 10 M4 17l4 4 M4 12l9 9',
+  'post-rayao':'M3 3v18h18 M19 3L7 15 M12 15H7v-5 M14 18l4-4 M17 20l4-4',
+  'post-motion':'M2 6h8 M2 12h5 M2 18h8 M22 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0',
+  'post-glass':'M9 3h6l-3 18H6Z M2 8h6l8 8h6 M17 12l4 4-4 4',
+  'post-path':'M2 3l7 6-5 8 10 3 7-14 M6 9h6 M2 17h5 M12 20h4 M18 6h5',
+  sidebar:'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z M9 3v18',
+  collapseRight:'M15 6l-6 6 6 6',
+  expandRight:'M9 6l6 6-6 6',
+  'channel-anchor':'M12 3v18 M3 12h18 M8 7l4-4 4 4 M7 8l-4 4 4 4 M8 17l4 4 4-4 M17 8l4 4-4 4',
+  'channel-rotation':'M4 12a8 8 0 1 0 2-6 M3 3v5h5 M5 15c3 3 11 3 14 0 M12 4c-4 4-4 12 0 16',
+  'channel-axisX':'M4 12h16 M16 8l4 4-4 4 M6 17l4 4 M10 17l-4 4',
+  'channel-axisY':'M5 19L19 5 M13 5h6v6 M4 4l3 3 3-3 M7 7v4',
+  'channel-axisZ':'M12 20V4 M8 8l4-4 4 4 M17 14h4l-4 6h4',
+  'channel-yaw':'M3 12c0-4 18-4 18 0s-18 4-18 0 M17 6l4 6-6 1 M12 5v14',
+  'channel-pitch':'M12 3c-4 0-4 18 0 18s4-18 0-18 M6 7l6-4 1 6 M5 12h14',
+  'channel-roll':'M5 7a8 8 0 1 1-1 9 M5 3v5h5 M8 12h8 M12 8v8',
+  'channel-distance':'M3 5v14 M21 5v14 M4 12h16 M8 8l-4 4 4 4 M16 8l4 4-4 4',
+  'channel-fov':'M3 12L21 3v18L3 12Z M12 8a9 9 0 0 1 0 8',
+  'channel-aspect':'M3 5h18v14H3Z M7 9v6h10 M14 12l3 3-3 3',
+  'channel-orthoWidth':'M4 5h16v10H4Z M4 20h16 M7 17l-3 3 3 3 M17 17l3 3-3 3',
+  'channel-nearPlane':'M3 5h8v14H3Z M14 3h7v18h-7 M6 9h2 M6 15h2 M11 12h10',
+  'channel-farPlane':'M3 5h8v14H3Z M14 3h7v18h-7 M17 7h2 M17 17h2 M3 12h11',
+
+  dialogue:'M4 4h16v13H9l-5 4V4Z M8 9h8 M8 13h5',
   help:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20 M9 8a3 3 0 0 1 6 0c0 2-3 2-3 5 M12 17v.1',
   more:'M5 12h.1 M12 12h.1 M19 12h.1',
   grip:'M9 5h.1 M15 5h.1 M9 12h.1 M15 12h.1 M9 19h.1 M15 19h.1',
@@ -19,6 +59,7 @@ const shapes:Record<string,string>={
   input:'M3 5h18v14H3Z M6 9h1 M10 9h1 M14 9h1 M18 9h1 M6 13h1 M10 13h8',
   range:'M4 4v16h5 M20 4v16h-5 M8 12h8 M10 9l-3 3 3 3 M14 9l3 3-3 3',
   sliders:'M4 6h16 M4 12h16 M4 18h16 M8 3v6 M16 9v6 M10 15v6',
+  outputs:'M3 9h5v6H3Z M8 12h4 M12 5v14 M12 5h5 M12 19h5 M17 3h4v4h-4Z M17 17h4v4h-4Z',
   smooth:'M2 15c5 0 4-8 8-8s3 10 7 10 3-5 5-5',
   effect:'M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z',
   occlusion:'M4 3h10v18H4Z M18 7h3v10h-3 M7 7h4 M7 11h4 M7 15h4',
@@ -35,6 +76,6 @@ const shapes:Record<string,string>={
   value:'M4 4h16v16H4Z M8 8h8 M8 12h4 M8 16h8',
   search:'M16 10a6 6 0 1 1-12 0 6 6 0 0 1 12 0 M15 15l6 6'
 };
-export const assetIcons:Record<string,string>={Value:'value',Rig:'camera',Input:'input',Range:'range',Sensitivity:'sliders',Smooth:'smooth',Effect:'effect',Occlusion:'occlusion',Curve:'curve',Pipeline:'pipeline'};
+export const assetIcons:Record<string,string>={Value:'value',Rig:'camera',Input:'input',Range:'range',Sensitivity:'sliders',Smooth:'smooth',Effect:'effect',PostProcessing:'outputs',Occlusion:'occlusion',Curve:'curve',Pipeline:'pipeline'};
 export default function Icon({name,size=16,className=''}:{name:string;size?:number;className?:string}){return <svg className={'ui-icon icon-'+name+' '+className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d={shapes[name]||shapes.file}/></svg>;}
 export function IconButton({icon,label,children,...props}:ButtonHTMLAttributes<HTMLButtonElement>&{icon:string;label:string}){return <button {...props} aria-label={props['aria-label']||label} title={props.title||label}><Icon name={icon}/>{children}</button>;}

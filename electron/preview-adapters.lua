@@ -133,6 +133,19 @@ end
 
 -- 通用对象操作与文件接口使用 Foundation 对象，相机专属操作使用独立对象。
 local UETool = {ReadText=function(path) return bundle.files[path]~=nil,bundle.files[path] end}
+-- Fixed simulation time and bundled files are the only engine boundary for InputSystem.
+UETool.InputTime = 0
+function UETool.GetTime() return UETool.InputTime end
+function UETool.GetProjectDirectory(kind) assert(kind=='Content');return '__content__' end
+function UETool.ListDirectory(directory,pattern,files,folders,recursive)
+    assert(directory=='__content__/Lua/InputSystem/MyIMC/Definition/Definitions' and files and not folders and not recursive)
+    local names={}
+    for file in pairs(bundle.files) do
+        local name=file:sub(#directory+2)
+        if file:sub(1,#directory+1)==directory..'/' and name:match('^[^/]+%.json$') then names[#names+1]=name end
+    end
+    table.sort(names);return true,names
+end
 
 -- 仿真真实 Actor 的速度查询能力，接口缺失仍报告不可用。
 function UETool.CanGetActorVelocity(actor) return actor ~= nil and type(actor.GetVelocity) == "function" end
@@ -224,7 +237,13 @@ function UECamera.ConfigureCameraComponent(actor, config)
     camera.PostProcessBlendWeight = config.PostProcessBlendWeight
     camera.ProjectionMode = config.ProjectionMode
     camera.bConstrainAspectRatio = config.bConstrainAspectRatio
-    camera.PostProcessSettings = camera.PostProcessSettings or {}
+    if not camera.PostProcessSettings then
+        camera.PostProcessSettings = {}
+        for _, field in ipairs(require("CameraFramework.PostProcessing.Adaptation.PostProcessFields").GetFields()) do
+            camera.PostProcessSettings[field.Native] = require("CameraFramework.Shared.AssetLoading.Copy")(field.Default)
+            camera.PostProcessSettings[field.OverrideName] = false
+        end
+    end
     camera.bOverrideAspectRatioAxisConstraint = config.bOverrideAspectRatioAxisConstraint
     camera.AspectRatioAxisConstraint = config.AspectRatioAxisConstraint
     camera.bAutoCalculateOrthoPlanes = config.bAutoCalculateOrthoPlanes
@@ -304,6 +323,12 @@ function UETool.SphereTraceSingle(world, startLocation, endLocation, radius, cha
                 else hi=0 end
                 if not nearest or hi<nearest then nearest,component=hi,box end
             end
+        end
+    end
+    if world.MeshCollision then
+        local distance,index=Collision.Trace(world.MeshCollision,startLocation,endLocation,radius)
+        if distance and (not nearest or distance<nearest*length) then
+            hitResult.Distance=distance;hitResult.Component=world.MeshComponents[index];return true
         end
     end
     if not nearest then return false end
@@ -423,5 +448,5 @@ end
 package.loaded["Foundation.Adaptation.UEMath"]=UEMath
 package.loaded["Foundation.Adaptation.UETool"]=UETool
 package.loaded["Foundation.Adaptation.SluaAPI"]=SluaAPI
-package.loaded["CameraFramework.Adaptation.UECamera"]=UECamera
+package.loaded["CameraFramework.CameraSystem.Adaptation.UECamera"]=UECamera
 return {UETool=UETool,UEMath=UEMath,UECamera=UECamera,SluaAPI=SluaAPI}

@@ -2,10 +2,10 @@ const {test,before}=require('node:test');
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {Project,encode}=require('../electron/project.cjs');
 let project;
-before(async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-value-editor-'));const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';await fs.cp(source,path.join(dir,'CameraFramework'),{recursive:true});await fs.cp(path.join(path.dirname(source),'Foundation'),path.join(dir,'Foundation'),{recursive:true});project=await Project.open(path.join(dir,'CameraFramework'),path.join(dir,'data'),path.resolve('runtime/lua54.exe'));});
+before(async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-value-editor-'));const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'D:/MyWorks/Lua/CameraFramework';await fs.cp(source,path.join(dir,'CameraFramework'),{recursive:true});await fs.cp(path.join(path.dirname(source),'Foundation'),path.join(dir,'Foundation'),{recursive:true});await fs.cp(path.join(path.dirname(source),'InputSystem'),path.join(dir,'InputSystem'),{recursive:true});for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor','Player',name+'.lua'),path.join(dir,'Actor','Player',name+'.lua'));project=await Project.open(path.join(dir,'CameraFramework'),path.join(dir,'data'),path.resolve('runtime/lua54.exe'));});
 test('target slots recognize value references and reject references of another type',async()=>{
   const snap=await project.snapshot(),asset=snap.assets.find(a=>a.path==='Assets/CameraAssets/InteractiveCamera/Player/Dialogue/InputAssets/Dialogue_Enter.input');
-  assert.equal(asset.refs.length,2);assert.ok(asset.refs.every(r=>r.type==='Value'));
+  assert.equal(asset.refs.length,asset.data.ValueAssets.length);assert.ok(asset.refs.every(r=>r.type==='Value'));
   const doc=await project.read(asset.path),data=JSON.parse(doc.text);data.ValueAssets[0].Path='Assets/CurveAssets/Bezier/Linear.curve';
   await assert.rejects(()=>project.save({...doc,text:encode(data)}),/Value/);assert.equal((await project.read(doc.path)).text,doc.text);
 });
@@ -14,7 +14,7 @@ test('duplicate slot keys and legacy schemas cannot be saved, optional keys are 
   for(const mutate of [d=>d.ValueAssets[1].Id=d.ValueAssets[0].Id,d=>d.ValueAssets=[],d=>d.SchemaVersion=2,d=>d.Channels={},d=>d.bTargetsById=true]){
     const data=JSON.parse(doc.text);mutate(data);await assert.rejects(()=>project.save({...doc,text:encode(data)}));assert.equal((await project.read(doc.path)).text,doc.text);
   }
-  const data=JSON.parse(doc.text);delete data.ValueAssets[0].Id;data.ValueAssets[1].Id='10001';data.ValueAssets.reverse();
+  const data=JSON.parse(doc.text);delete data.ValueAssets[0].Id;data.ValueAssets[1].Id='10001';data.ValueAssets.unshift(data.ValueAssets.splice(1,1)[0]);
   const saved=await project.save({...doc,text:encode(data)});assert.equal(JSON.parse(saved.text).ValueAssets[0].Id,'10001');await project.save({...saved,text:doc.text});
 });
 test('value assets can be cloned and moved with explicit path references; referenced values cannot be deleted',async()=>{

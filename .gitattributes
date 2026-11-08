@@ -1,0 +1,2 @@
+# Preserve upstream bytes and SHA-256 checksums across platform checkouts.
+public/preview/** -text
