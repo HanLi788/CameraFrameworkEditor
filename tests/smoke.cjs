@@ -1,2 +1,2 @@
-// The workbench and game are tested together across their real Electron windows.
+﻿// Exercise the asset workbench in a real Electron window.
 require('./workbench-ui.cjs');

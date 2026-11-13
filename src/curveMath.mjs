@@ -9,7 +9,7 @@ export function curveY(data,x){
   const i=p.findIndex((n)=>n.X>=x);const a=p[Math.max(0,(i<0?p.length-1:i)-1)],b=p[Math.max(1,i<0?p.length-1:i)];const dx=b.X-a.X,t=(x-a.X)/dx;
   return (2*t**3-3*t*t+1)*a.Y+(t**3-2*t*t+t)*dx*a.Tangent+(-2*t**3+3*t*t)*b.Y+(t**3-t*t)*dx*b.Tangent;
 }
-export function curveTemplate(parentType){return parentType==='Bezier'?{SchemaVersion:3,ParentType:parentType,P1:{X:0,Y:0},P2:{X:1/3,Y:1/3},P3:{X:2/3,Y:2/3},P4:{X:1,Y:1}}:{SchemaVersion:3,ParentType:parentType,Points:[{X:0,Y:0,Tangent:0},{X:1,Y:1,Tangent:0}]};}
+export function curveTemplate(parentType){return parentType==='Bezier'?{SchemaVersion:1,ParentType:parentType,P1:{X:0,Y:0},P2:{X:1/3,Y:1/3},P3:{X:2/3,Y:2/3},P4:{X:1,Y:1}}:{SchemaVersion:1,ParentType:parentType,Points:[{X:0,Y:0,Tangent:0},{X:1,Y:1,Tangent:0}]};}
 export const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 // Integer tick indices keep the 0.1 grid anchored while panning and avoid -0.
 export function curveTicks(start,size){

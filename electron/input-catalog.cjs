@@ -35,7 +35,7 @@ class InputCatalog {
  }
 }
 function inputIssues(asset,catalog){
- const data=asset.data;if(asset.type!=='Input'||data?.Type!=='UserInput'||data.SchemaVersion!==5)return [];
+ const data=asset.data;if(asset.type!=='Input'||!asset.path.endsWith('.userInput')||data.SchemaVersion!==1)return [];
  const issue=(field,message)=>({path:asset.path,field,message,severity:'error'}),context=catalog.contexts.find(c=>c.name===data.IMCName);
  if(!context||context.error)return [issue('IMCName','IMCName 不存在或定义无效：'+String(data.IMCName??''))];
  return Object.entries(data.Channels||{}).filter(([,c])=>c?.bEnabled===true&&!context.mappings.includes(c.MappingName)).map(([name,c])=>issue('Channels.'+name+'.MappingName','MappingName 不存在于 '+data.IMCName+'：'+String(c.MappingName??'')));

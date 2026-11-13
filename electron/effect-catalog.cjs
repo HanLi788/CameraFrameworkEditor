@@ -1,5 +1,5 @@
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto'),{spawn}=require('node:child_process');
-const directory='CameraSystem/Effects/InterfaceRegistry.lua';
+const directory='InterfaceRegistry/GameplayCameraSystem/InterfaceRegistry.lua';
 const literal=text=>{let delimiter='====';while(text.includes(']'+delimiter+']'))delimiter+='=';return '['+delimiter+'['+text+']'+delimiter+']';};
 async function collect(workspace){
  const modules={},files={};
@@ -25,7 +25,8 @@ class EffectCatalog {
   if(this.revision!==revision){
    this.revision=revision;
    this.pending=(async()=>{
-    const script='local Json=assert(load('+literal(bundle.modules['Foundation.Serialization.JsonReader'])+'))()\nlocal bundle=Json.Decode('+literal(payload)+')\n'+await fs.readFile(path.join(__dirname,'effect-catalog.lua'),'utf8');
+    const performanceReader=await fs.readFile(path.join(__dirname,'performance-catalog.lua'),'utf8');
+    const script='local readPerformanceNames=(function()\n'+performanceReader+'\nend)()\nlocal Json=assert(load('+literal(bundle.modules['Foundation.Serialization.JsonReader'])+'))()\nlocal bundle=Json.Decode('+literal(payload)+')\n'+await fs.readFile(path.join(__dirname,'effect-catalog.lua'),'utf8');
     return {...await run(runtime,script),revision};
    })();
   }

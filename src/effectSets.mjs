@@ -43,6 +43,6 @@ export function constantEffectSet(text, output = false) {
   try { const set = parseEffectSet(text, output); return set.min === set.max; } catch { return false; }
 }
 export function effectOutputTemplate(domain, assets) {
-  const curve = assets.find(a => a.type === 'Curve' && a.path === 'Assets/CurveAssets/Bezier/Linear.curve') || assets.find(a => a.type === 'Curve');
-  return constantEffectSet(domain) || !curve ? {Range:'{0}'} : {Range:'[0,1]', Curve:curve.path};
+  const curve = assets.find(a => a.type === 'Curve' && a.path === 'Assets/Shared/CurveAssets/Bezier/Linear.curve') || assets.find(a => a.type === 'Curve');
+  return constantEffectSet(domain) || !curve ? {Type:'Scalar',Range:'{0}'} : {Type:'Scalar',Range:'[0,1]', Curve:curve.path.replace(/^Assets\//,'')};
 }

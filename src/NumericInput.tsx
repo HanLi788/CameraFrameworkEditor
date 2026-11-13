@@ -1,4 +1,4 @@
-import {useEffect,useId,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useId,useRef,useState} from 'react';
 import {t} from './i18n';
 import {rangeError,parseRangeNumber} from './rangeChannels.mjs';
 
@@ -19,7 +19,7 @@ export default function NumericInput({name,value,onChange,validate=rangeError,si
     }).catch(e=>{setError(e.message);throw e;}).finally(()=>{pending.current=null;});
     pending.current=job;return job;
   };
-  useEffect(()=>{const el=host.current;if(!el)return;const handler=(e:Event)=>(e as CustomEvent<Promise<any>[]>).detail.push(commit());el.addEventListener('commit-range',handler);return()=>el.removeEventListener('commit-range',handler);});
+  useLayoutEffect(()=>{const el=host.current;if(!el)return;const handler=(e:Event)=>(e as CustomEvent<Promise<any>[]>).detail.push(commit());el.addEventListener('commit-range',handler);return()=>el.removeEventListener('commit-range',handler);});
   const shownError=error||validate(name,...keys.map(key=>value[key]));
   return <div className="range-cell"><div ref={host} data-range-interval className={'range-interval '+(single?'numeric-single ':'')+(shownError?'invalid':'')} role={single?undefined:'group'} aria-label={single?undefined:name+' '+t('范围')}
     onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))void commit().catch(()=>{});}}

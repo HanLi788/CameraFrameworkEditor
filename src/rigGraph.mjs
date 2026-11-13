@@ -15,7 +15,7 @@ export function rigOwners(assets) {
   return new Map([...owners].map(([path,rigs])=>[path,[...rigs].sort()]));
 }
 export const rigGroups=[
-  ['Pipelines','管线'],['Ranges','范围约束'],['Processors.Input.Assets','输入'],
+  ['Pipelines','管线'],['Ranges','范围约束'],['Processors.Input','输入'],
   ['Processors.Occlusion','遮挡'],
   ['Processors.Effects','效果'],['Processors.Smooth','平滑'],['ValueAssets','目标值'],
 ];

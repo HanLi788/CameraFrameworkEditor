@@ -1,5 +1,0 @@
-{
-  "basic": {"label":"基础测试场","spawn":[0,0,88],"target":[250,0,88],"route":[[-400,0,88],[400,0,88]]},
-  "city": {"label":"城镇街道","model":"preview/maps/city/scene.gltf","scale":0.03,"offset":[13.06,3.56,13.61],"spawn":[0,0,88],"target":[250,0,88],"route":[[0,-800,88],[0,800,88]]},
-  "city-corner": {"label":"城镇墙边","model":"preview/maps/city/scene.gltf","scale":0.03,"offset":[13.06,3.56,13.61],"spawn":[-500,1000,114],"target":[-250,1000,114],"route":[[-500,500,114],[-500,1200,114]]}
-}

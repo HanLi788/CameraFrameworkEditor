@@ -22,48 +22,36 @@ end
 local Json=assert(load(bootstrapJson(bundleText),'JsonReader'))()
 local bundle=Json.Decode(bundleText)
 table.insert(package.searchers,1,function(name)
+    if package.preload[name] then return package.preload[name] end
     if bundle.modules[name] then return assert(load(bundle.modules[name],name)) end
     return '\n\tModule not supplied: '..name
 end)
 package.loaded['Foundation.Serialization.JsonReader']=Json
-package.loaded['Foundation.Adaptation.UETool']={ReadText=function(p) return bundle.files[p]~=nil,bundle.files[p] end}
-package.loaded['Foundation.Adaptation.UEMath']={GetForwardVector=function(r)
-    local p,y=math.rad(r.Pitch),math.rad(r.Yaw)
-    return require('Foundation.Math.Vector3D').New(math.cos(p)*math.cos(y),math.cos(p)*math.sin(y),math.sin(p))
-end}
-package.loaded['Foundation.Adaptation.SluaAPI']={}
-package.loaded['CameraFramework.CameraSystem.Adaptation.UECamera']={}
-package.loaded['CameraFramework.Shared.AssetLoading.AssetPaths']={GetRootDirectory=function() return '__editor__' end}
-local function quote(s)
-    return '"'..tostring(s):gsub('[%z\1-\31\\"]',function(c)
-        local m={['"']='\\"',['\\']='\\\\',['\n']='\\n',['\r']='\\r',['\t']='\\t'}
-        return m[c] or string.format('\\u%04x',string.byte(c))
-    end)..'"'
+
+local function quote(value)
+ return '"'..tostring(value):gsub('[%z\1-\31\\"]',function(c)
+  local escapes={['"']='\\"',['\\']='\\\\',['\n']='\\n',['\r']='\\r',['\t']='\\t'}
+  return escapes[c] or string.format('\\u%04x',string.byte(c))
+ end)..'"'
 end
-local issues={};local checked=0
-local ok,err=pcall(function()
-    local map={Value='CameraSystem.Values',Range='CameraSystem.Ranges',Smooth='CameraSystem.Smoothing',Sensitivity='CameraSystem.Sensitivity',Input='CameraSystem.Inputs',Effect='CameraSystem.Effects',PostProcessing='PostProcessing',Occlusion='CameraSystem.Occlusion',Pipeline='CameraSystem.Pipeline'}
-    for _,entry in ipairs(bundle.assets) do
-        local file=entry.path
-        local valid,message=pcall(function()
-            if entry.type=='Curve' then require('CameraFramework.Shared.Curves.CurveLibrary').GetDefault():Resolve(file)
-            elseif entry.type=='Rig' then
-                local raw=Json.Decode(bundle.files['__editor__/'..file])
-                local pipeline=require('CameraFramework.CameraSystem.Pipeline.AssetLibrary').GetDefault():Get(assert(raw.Pipelines[1],'装置缺少管线'))
-                local space=assert(({Action='ActionCamera',Idle='IdleCamera',Battle='BattleCamera',Interactive='InteractiveCamera'})[pipeline.SpaceType],'Unknown space type')
-                local prefix='CameraFramework.CameraSystem.CameraSpaces.'..space
-                local validator=require(prefix..(space=='IdleCamera' and '.Definition.Validator' or '.Rig.Definition.Validator'))
-                require('CameraFramework.CameraSystem.AssetLoading.DefinitionLoader').Load('__editor__/'..file,validator.Validate,require(prefix..'.PipelineRules').Environment(),file)
-            else require('CameraFramework.'..assert(map[entry.type])..'.AssetLibrary').GetDefault():Get(file) end
-        end)
-        if valid then checked=checked+1 else issues[#issues+1]='{"path":'..quote(file)..',"severity":"error","message":'..quote(message)..'}' end
-    end
+local checked=0
+local ok,message=pcall(function()
+ local Workspace=require('CameraFramework.Editor.Workspace')
+ local workspace=Workspace.New({Root='__editor__/Assets',ReadText=function(file)return assert(bundle.files[file],'Missing asset: '..file)end})
+ -- Check source-only fields before execution configuration drops diagnostic extras.
+ local original=workspace.OnSource
+ function workspace:OnSource(file,raw)
+  original(self,file,raw)
+  local Validator=require('Foundation.Validation.ValueValidator')
+  local allowed=file:match('%.sensitivity$') and {Type=true,bEnabled=true,EscapeCurve=true,ReturnCurve=true}
+   or file:match('%.smooth$') and {Type=true,bEnabled=true,SpeedRange=true,MaxLag=true,ResponseCurve=true}
+  if allowed then for name,node in pairs(raw.Channels)do Validator.ValidateAllowedFields(node,allowed,file..'.Channels.'..name)end end
+  if file:match('%.effect$')then require('CameraFramework.Editor.GameplayCameraSystem.AssetLoading.Effects.AssetDefinition').ValidateOutputs(raw.Outputs,file..'.Outputs',false,require('CameraFramework.Editor.Validation.EffectContract').ValidateDomain(raw.Source,raw.Domain,file))end
+ end
+ workspace:Build()
+ for _,asset in ipairs(bundle.assets)do
+  local key=asset.path:match('^Assets/(.*)$')
+  if key and Workspace.IsAsset(key)then assert(workspace.Files[key],'Framework 未覆盖资产：'..key);checked=checked+1 end
+ end
 end)
-local planText
-if ok and #issues==0 then
-    ok,err=pcall(function()
-        planText=require('CameraFramework.PostProcessing.Compiler').Compile(require('CameraFramework.PostProcessing.Bindings'),'__editor__')
-    end)
-end
-if not ok then issues[#issues+1]='{"path":"","severity":"error","message":'..quote(err)..'}' end
-io.write('EDITOR_RESULT:{"checked":'..checked..',"issues":['..table.concat(issues,',')..'],"planText":'..(planText and quote(planText) or 'null')..'}\n')
+io.write('EDITOR_RESULT:{"checked":'..checked..',"issues":['..(ok and '' or '{"path":"","severity":"error","message":'..quote(message)..'}')..']}\n')

@@ -22,9 +22,9 @@ export function EffectSetField({value,onChange,path,domain,readOnly=false,displa
 
 export function EffectOutput({value,onChange,onRange,domain,path,assets,onNavigate,hideRange=false}:any) {
   const constant=constantEffectSet(value.Range,true);
-  const unexpected=Object.keys(value).filter(key=>key!=='Range'&&key!=='Curve');
+  const unexpected=Object.keys(value).filter(key=>key!=='Type'&&key!=='Range'&&key!=='Curve');
   const curves=assets.filter((a:any)=>a.type==='Curve');
-  const addCurve=()=>{const curve=curves.find((a:any)=>a.path==='Assets/CurveAssets/Bezier/Linear.curve')||curves[0];if(curve)onChange({...value,Curve:curve.path});};
+  const addCurve=()=>{const curve=curves.find((a:any)=>a.path==='Assets/Shared/CurveAssets/Bezier/Linear.curve')||curves[0];if(curve)onChange({...value,Curve:curve.path.replace(/^Assets\//,'')});};
   return <div className="effect-output">
     {unexpected.length>0&&<p className="effect-set-error" role="alert">{t('存在旧版或未知字段，请在源码中修复：')}{unexpected.join(', ')}</p>}
     {!hideRange&&<EffectSetField value={value.Range} domain={domain} path={path+'.Range'} onChange={onRange}/>}

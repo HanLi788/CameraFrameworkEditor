@@ -8,7 +8,7 @@ const presets:Record<string,string>={
   'CubicHermiteSpline/RangeUnit':'恒定倍率','CubicHermiteSpline/RangeSoftEdge':'柔和边缘','CubicHermiteSpline/RangeLinearEdge':'线性边缘'
 };
 export function curveLabel(path:string){
-  const key=path.startsWith('Assets/CurveAssets/')?path.slice(19).replace(/\.curve$/i,''):'';
+  const key=path.startsWith('Assets/Shared/CurveAssets/')?path.slice('Assets/Shared/CurveAssets/'.length).replace(/\.curve$/i,''):'';
   return presets[key]?t(presets[key]):filename(path).replace(/\.curve$/i,'');
 }
 export function curveOptionLabel(path:string,choices:{path:string}[]){

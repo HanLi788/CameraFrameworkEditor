@@ -1,10 +1,8 @@
 const {contextBridge,ipcRenderer}=require('electron');
 const invoke=name=>(...args)=>ipcRenderer.invoke('editor:'+name,...args);
 contextBridge.exposeInMainWorld('cameraEditor',{
-  liveDebugFlushed:invoke('live-debug-flushed'),
-  markdownImage:invoke('markdown-image'),external:invoke('external'),game:invoke('game'),pinTab:invoke('pin-tab'),scene:invoke('scene'),simulate:invoke('simulation'),bootstrap:invoke('bootstrap'),settings:invoke('settings'),chooseProject:invoke('choose-project'),openProject:invoke('open-project'),snapshot:invoke('snapshot'),read:invoke('read'),ensure:invoke('ensure'),
-  postBindings:invoke('post-bindings'),closePostProcessing:invoke('close-postprocessing'),openPostProcessing:invoke('open-postprocessing'),
-  closeDetail:invoke('close-detail'),detailBack:invoke('detail-back'),selectTab:invoke('select-tab'),closeTab:invoke('close-tab'),openFile:invoke('open-file'),context:invoke('context'),editText:invoke('edit-text'),editField:invoke('edit-field'),history:invoke('history'),reload:invoke('reload'),discard:invoke('discard'),saveSession:invoke('save-session'),
+  finishClose:invoke('finish-close'),markdownImage:invoke('markdown-image'),external:invoke('external'),bootstrap:invoke('bootstrap'),settings:invoke('settings'),chooseProject:invoke('choose-project'),openProject:invoke('open-project'),snapshot:invoke('snapshot'),read:invoke('read'),ensure:invoke('ensure'),
+  selectProcessor:invoke('select-processor'),selectTab:invoke('select-tab'),closeTab:invoke('close-tab'),openFile:invoke('open-file'),editText:invoke('edit-text'),editField:invoke('edit-field'),history:invoke('history'),reload:invoke('reload'),discard:invoke('discard'),saveSession:invoke('save-session'),
   mutate:invoke('mutate'),validate:invoke('validate'),reveal:invoke('reveal'),recovery:invoke('recovery'),preferences:invoke('preferences'),
   onEvent:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('editor:event',listener);return()=>ipcRenderer.removeListener('editor:event',listener);}
 });

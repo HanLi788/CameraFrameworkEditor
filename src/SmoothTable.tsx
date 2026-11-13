@@ -1,3 +1,4 @@
+import {assetFile} from './assetPaths.mjs';
 import {t} from './i18n';
 import Icon from './Icon';
 import HelpTip from './HelpTip';
@@ -13,9 +14,9 @@ export default function SmoothTable({value,onField,assets,onNavigate}:any){
       const channel=value[name];
       if(!channel||typeof channel!=='object'||Array.isArray(channel))return <tr key={name}><th>{t(label)}</th><td colSpan={4} className="range-error" role="alert">{t('通道配置无效，请在源码中修复')}</td></tr>;
       const speed=channel.SpeedRange,validSpeed=speed&&typeof speed==='object'&&!Array.isArray(speed);
-      const unknown=[...Object.keys(channel).filter(k=>!['bEnabled','SpeedRange','MaxLag','ResponseCurve'].includes(k)),...(validSpeed?Object.keys(speed).filter(k=>!['Min','Max'].includes(k)).map(k=>'SpeedRange.'+k):[])];
+      const unknown=[...Object.keys(channel).filter(k=>!['Type','bEnabled','SpeedRange','MaxLag','ResponseCurve'].includes(k)),...(validSpeed?Object.keys(speed).filter(k=>!['Min','Max'].includes(k)).map(k=>'SpeedRange.'+k):[])];
       const curvePath=typeof channel.ResponseCurve==='string'?channel.ResponseCurve:'';
-      const validCurve=assets.some((a:any)=>a.type==='Curve'&&a.path===curvePath);
+      const validCurve=assets.some((a:any)=>a.type==='Curve'&&a.path===assetFile(curvePath));
       return <tr key={name} data-smooth-channel={name} className={channel.bEnabled?'':'range-disabled'}><th scope="row" title={name}><div className="range-channel"><Icon name={'channel-'+icon} size={18}/><span>{t(label)}</span></div>{unknown.length>0&&<small className="range-error" role="alert">{t('存在旧版或未知字段，请在源码中修复：')}{unknown.join(', ')}</small>}</th>
         <td>{validSpeed?<NumericInput name={name+'.SpeedRange'} value={speed} validate={speedError} onChange={(next:any)=>onField(['Channels',name,'SpeedRange'],next,speed)}/>:<small className="range-error" role="alert">{t('速率区间无效，请在源码中修复')}</small>}</td>
         <td><NumericInput single name={name+'.MaxLag'} value={{Value:channel.MaxLag}} validate={lagError} onChange={(next:any)=>onField(['Channels',name,'MaxLag'],next.Value,channel.MaxLag)}/></td>

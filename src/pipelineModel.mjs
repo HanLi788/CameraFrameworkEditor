@@ -4,10 +4,10 @@ export const implementations=space=>[...baseStages.map(name=>'Common.'+name),...
 const requires={'Common.Occlusion':['Render'],'Battle.Evaluation':['Subject']};
 export function pipelineProblems(data){
   const errors=[];
-  if(data.SchemaVersion!==3)errors.push(['管线资产版本必须为 3','']);
+  if(data.SchemaVersion!==1)errors.push(['管线资产版本必须为 1','']);
   if(!data.Stages||typeof data.Stages!=='object'||Array.isArray(data.Stages)||!Array.isArray(data.Flow)||!Array.isArray(data.Disabled))return [['管线结构无效，请在源码中修复','']];
   const all=[...data.Flow,...data.Disabled],allowed=implementations(data.SpaceType);
-  if(!['Action','Battle','Idle','Interactive'].includes(data.SpaceType))errors.push(['未知相机空间类型：',String(data.SpaceType)]);
+  if(!['Action','Battle','Idle','Interactive','Preview'].includes(data.SpaceType))errors.push(['未知相机空间类型：',String(data.SpaceType)]);
   if(!data.Flow.length)errors.push(['管线至少需要一个启用阶段','']);
   for(const name of new Set([...baseStages,...Object.keys(data.Stages),...all])){
     if(!data.Stages[name]||all.filter(n=>n===name).length!==1){errors.push(['阶段必须声明且只归属一个列表：',String(name)]);continue;}
@@ -28,9 +28,9 @@ export function toggleStage(data,name,enabled){
 }
 export function pipelineImpact(data,path,assets){
   if(!Array.isArray(data.Flow))return [];
-  return assets.filter(a=>a.type==='Rig'&&a.data?.Pipelines?.includes(path)).map(a=>{
+  return assets.filter(a=>a.type==='Rig'&&a.data?.Pipelines?.includes(path.replace(/^Assets\//,''))).map(a=>{
     const processors=a.data.Processors||{},missing=data.Flow.filter(n=>!Object.hasOwn(processors,n)),extra=Object.keys(processors).filter(n=>!data.Flow.includes(n));
-    const space=/^Assets\/CameraAssets\/(Action|Battle|Idle|Interactive)Camera\//.exec(a.path)?.[1];
+    const space=/^Assets\/GameplayCameraSystem\/CameraAssets\/(Action|Battle|Idle|Interactive|Preview)Camera\//.exec(a.path)?.[1];
     return {path:a.path,missing,extra,spaceMismatch:!!space&&space!==data.SpaceType};
   }).filter(a=>a.missing.length||a.extra.length||a.spaceMismatch);
 }

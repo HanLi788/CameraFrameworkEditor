@@ -74,8 +74,9 @@ const shapes:Record<string,string>={
   play:'M7 3l14 9-14 9Z',pause:'M7 4v16 M17 4v16',stop:'M5 5h14v14H5Z',
   up:'M6 15l6-6 6 6',
   value:'M4 4h16v16H4Z M8 8h8 M8 12h4 M8 16h8',
+  image:'M3 3h18v18H3Z M3 17l6-6 4 4 3-3 5 5 M16 7h.01',
   search:'M16 10a6 6 0 1 1-12 0 6 6 0 0 1 12 0 M15 15l6 6'
 };
-export const assetIcons:Record<string,string>={Value:'value',Rig:'camera',Input:'input',Range:'range',Sensitivity:'sliders',Smooth:'smooth',Effect:'effect',PostProcessing:'outputs',Occlusion:'occlusion',Curve:'curve',Pipeline:'pipeline'};
+export const assetIcons:Record<string,string>={TransitionInput:'input',Camera:'camera',Share:'link',VirtualInput:'input',NumEffect:'effect',BoolEffect:'effect',Filter:'outputs',Value:'value',Rig:'camera',Input:'input',Range:'range',Sensitivity:'sliders',Smooth:'smooth',Effect:'effect',PostProcessing:'outputs',Occlusion:'occlusion',Curve:'curve',Pipeline:'pipeline'};
 export default function Icon({name,size=16,className=''}:{name:string;size?:number;className?:string}){return <svg className={'ui-icon icon-'+name+' '+className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d={shapes[name]||shapes.file}/></svg>;}
 export function IconButton({icon,label,children,...props}:ButtonHTMLAttributes<HTMLButtonElement>&{icon:string;label:string}){return <button {...props} aria-label={props['aria-label']||label} title={props.title||label}><Icon name={icon}/>{children}</button>;}

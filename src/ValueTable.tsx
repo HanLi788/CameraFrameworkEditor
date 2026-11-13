@@ -1,3 +1,4 @@
+import {assetFile} from './assetPaths.mjs';
 import {useCallback,useState} from 'react';
 import {t} from './i18n';
 import Icon,{IconButton} from './Icon';
@@ -20,7 +21,7 @@ export default function ValueTable({value,onField,onTransform,assets,onNavigate}
       const c=value[name];
       if(!c||typeof c!=='object'||Array.isArray(c))return <tr key={name}><th>{t(label)}</th><td colSpan={6} role="alert" className="range-error">{t('通道配置无效，请在源码中修复')}</td></tr>;
       const types=valueTypes(name),vector=types.includes('Point'),unknown=Object.keys(c).filter(k=>!['bEnabled','ValueType','Value','Reference','Sample','Curve',...(c.Reference==='Explicit'?(vector?['Origin','Rotation']:['Base']):[])].includes(k));
-      const validCurve=assets.some((a:any)=>a.type==='Curve'&&a.path===c.Curve);
+      const validCurve=assets.some((a:any)=>a.type==='Curve'&&a.path===assetFile(c.Curve));
       return <tr key={name} data-value-channel={name} className={c.bEnabled?'':'range-disabled'}><th scope="row" title={name}><div className="range-channel"><Icon name={'channel-'+icon} size={18}/><span>{t(label)}</span></div>{unknown.length>0&&<small role="alert" className="range-error">{unknown.join(', ')}</small>}</th>
         <td>{types.length===1&&c.ValueType===types[0]?<span title={c.ValueType}>{t(valueLabels[c.ValueType])}</span>:<Select label={name+'.ValueType'} value={c.ValueType} options={types} onChange={(next:string)=>onField(['Channels',name,'ValueType'],next,c.ValueType)}/>}</td>
         <td>{vector?(Array.isArray(c.Value)&&c.Value.length===3?<div className="value-vector">{['X','Y','Z'].map((axis,i)=><label key={axis}><span>{axis}</span>{scalar(name,['Value',String(i)],c.Value[i])}</label>)}</div>:<small className="range-error" role="alert">{t('目标值必须是三分量数组，请在源码中修复')}</small>):scalar(name,['Value'],c.Value,(_label:string,n:number)=>valueError(name,c.Reference,n))}</td>
