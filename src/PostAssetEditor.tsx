@@ -14,7 +14,7 @@ export default function PostAssetEditor({value,assetType,catalog,assets,onNaviga
  const change=(name:string,fn:any)=>onTransform((current:any)=>({...current,Outputs:{...current.Outputs,[name]:fn(current.Outputs[name])}}));
  const write=(name:string,enabled:boolean)=>onTransform((current:any)=>{const outputs={...current.Outputs};if(enabled)outputs[name]=numeric?{Range:'{0}'}:channels.find((c:any)=>c.name===name)?.default??0;else delete outputs[name];return {...current,Outputs:outputs};});
  const numericCatalog={...catalog,objects:(catalog?.postObjects||[]).map((o:any)=>({...o,interfaces:o.interfaces.filter((i:any)=>i.definition.ReturnType==='number')}))};
- return <div className="post-asset-editor">
+ return <div className={'post-asset-editor'+(numeric?' numeric-post-editor':'')}>
   <Fields value={metadata} assetType={assetType} assets={assets} onNavigate={onNavigate} onField={onField}/>
   {numeric&&<EffectTable value={value} path="" catalog={numericCatalog} onTransform={onTransform} assets={assets} onNavigate={onNavigate} presets={presets} setPresets={setPresets} post numericPost propertiesOnly/>}
   <div className="post-asset-filter"><label>{t('后处理分组')}<select aria-label={t('后处理分组')} value={selected||''} onChange={e=>setGroup(e.target.value)}>{groups.map(g=><option key={g} value={g}>{postGroupLabel(g,language)}</option>)}</select></label><input aria-label={t('搜索通道')} placeholder={t('搜索通道')} value={query} onChange={e=>setQuery(e.target.value)}/></div>

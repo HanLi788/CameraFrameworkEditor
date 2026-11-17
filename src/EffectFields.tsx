@@ -1,3 +1,4 @@
+import {assetReference,referenceType} from './assetPaths.mjs';
 import HelpTip from './HelpTip';
 import {useEffect,useId,useState} from 'react';
 import {t} from './i18n';
@@ -24,10 +25,10 @@ export function EffectOutput({value,onChange,onRange,domain,path,assets,onNaviga
   const constant=constantEffectSet(value.Range,true);
   const unexpected=Object.keys(value).filter(key=>key!=='Type'&&key!=='Range'&&key!=='Curve');
   const curves=assets.filter((a:any)=>a.type==='Curve');
-  const addCurve=()=>{const curve=curves.find((a:any)=>a.path==='Assets/Shared/CurveAssets/Bezier/Linear.curve')||curves[0];if(curve)onChange({...value,Curve:curve.path.replace(/^Assets\//,'')});};
+  const addCurve=()=>{const curve=curves.find((a:any)=>a.path==='Assets/Shared/CurveAssets/Bezier/Linear.curve')||curves[0];if(curve)onChange({...value,Curve:assetReference(curve.path,assets)});};
   return <div className="effect-output">
     {unexpected.length>0&&<p className="effect-set-error" role="alert">{t('存在旧版或未知字段，请在源码中修复：')}{unexpected.join(', ')}</p>}
     {!hideRange&&<EffectSetField value={value.Range} domain={domain} path={path+'.Range'} onChange={onRange}/>}
-    {typeof value.Curve==='string'?<><AssetSlot compact={hideRange} hoverPreview={hideRange} value={value.Curve} type="Curve" assets={assets} label={path+'.Curve'} onNavigate={onNavigate} onChange={(Curve:string)=>onChange({...value,Curve})}/>{constant&&<button className="effect-remove-curve" onClick={()=>{const next={...value};delete next.Curve;onChange(next);}}>{t('移除常量映射曲线')}</button>}</>:<div className="effect-curve-empty">{(!constant||value.Curve!==undefined)&&<span role="alert">{t(value.Curve!==undefined?'曲线必须是资产路径，请选择曲线或在源码中修复。':'非单点值域必须指定曲线。')}</span>}<button disabled={!curves.length} onClick={addCurve}>{t('添加映射曲线')}</button></div>}
+    {!!referenceType(value.Curve)?<><AssetSlot compact={hideRange} hoverPreview={hideRange} value={value.Curve} type="Curve" assets={assets} label={path+'.Curve'} onNavigate={onNavigate} onChange={(Curve:string)=>onChange({...value,Curve})}/>{constant&&<button className="effect-remove-curve" onClick={()=>{const next={...value};delete next.Curve;onChange(next);}}>{t('移除常量映射曲线')}</button>}</>:<div className="effect-curve-empty">{(!constant||value.Curve!==undefined)&&<span role="alert">{t(value.Curve!==undefined?'曲线必须引用已登记文档，请选择曲线或在源码中修复。':'非单点值域必须指定曲线。')}</span>}<button disabled={!curves.length} onClick={addCurve}>{t('添加映射曲线')}</button></div>}
   </div>;
 }

@@ -191,3 +191,5 @@ button{align-items:center;gap:6px}button:not(.asset-card):not(.tree-row):not(.ta
 
 
 .post-asset-filter{display:flex;align-items:center;gap:16px;margin:16px 0}.post-asset-filter label{display:flex;align-items:center;gap:8px}.post-asset-filter input{flex:1}.post-asset-editor>.range-table{width:100%}
+
+.value-reference{flex-wrap:wrap}.value-reference select{min-width:115px}.socket-rotation{display:flex;align-items:center;gap:4px;width:100%;font-size:10px;white-space:nowrap}.sequence-editor{padding:12px 17px;border-block:1px solid var(--line);background:#252f36}.sequence-editor h3{font-size:12px;margin:0 0 8px}.sequence-editor p{font-size:11px;color:#91a7b2}

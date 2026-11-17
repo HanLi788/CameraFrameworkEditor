@@ -4,7 +4,7 @@ import {createPortal} from 'react-dom';
 import Icon from './Icon';
 
 // Keep document edits out of pointer motion: one drop commits one undoable reorder.
-export default function SortableList({items,onChange,renderItem,label,itemKey,table=false}: {items:any[];onChange:(items:any[])=>any;renderItem:(item:any,index:number)=>ReactNode;label:string;table?:boolean;itemKey?:(item:any,index:number)=>string}){
+export default function SortableList({items,onChange,renderItem,label,itemKey,table=false,disabled=false}: {items:any[];onChange:(items:any[])=>any;renderItem:(item:any,index:number)=>ReactNode;label:string;table?:boolean;disabled?:boolean;itemKey?:(item:any,index:number)=>string}){
   const root=useRef<HTMLDivElement>(null),active=useRef<any>(null),cleanup=useRef<()=>void>(()=>{}),latest=useRef({items,onChange});latest.current={items,onChange};
   const [drag,setDrag]=useState<any>(null),[announcement,setAnnouncement]=useState<number|'cancel'|null>(null);
   useEffect(()=>()=>cleanup.current(),[]);
@@ -12,7 +12,7 @@ export default function SortableList({items,onChange,renderItem,label,itemKey,ta
   useEffect(()=>{if(active.current&&active.current.signature!==signature)cleanup.current();},[signature]);
   function reorder(from:number,to:number){if(from===to)return;const next=[...latest.current.items],item=next.splice(from,1)[0];next.splice(to,0,item);const result=latest.current.onChange(next);Promise.resolve(result).then(ok=>{if(ok!==false)setAnnouncement(to+1);}).catch(()=>setAnnouncement('cancel'));}
   function start(e:React.PointerEvent<HTMLButtonElement>,index:number){
-    if(e.button!==0||items.length<2)return;e.preventDefault();cleanup.current();
+    if(disabled||e.button!==0||items.length<2)return;e.preventDefault();cleanup.current();
     const rows=[...root.current!.children] as HTMLElement[],rect=rows[index].getBoundingClientRect();
     const offsets=rows.map(row=>({top:row.offsetTop,height:row.offsetHeight}));
     const gap=offsets.length>1?offsets[1].top-offsets[0].top-offsets[0].height:0;
@@ -38,7 +38,7 @@ export default function SortableList({items,onChange,renderItem,label,itemKey,ta
   return <><div ref={root} role={table?'rowgroup':undefined} className="sortable-list" data-sorting={!!drag}>{items.map((item,index)=>{
     const shift=!drag||index===drag.index?0:drag.index<drag.to&&index>drag.index&&index<=drag.to?-(drag.height+drag.gap):drag.index>drag.to&&index>=drag.to&&index<drag.index?drag.height+drag.gap:0;
     return <div role={table?'row':undefined} className={'sortable-row mount-row '+(drag?.index===index?'drag-placeholder':'')} data-sort-index={index} key={itemKey?.(item,index)??index} style={{transform:`translateY(${shift}px)`}}>
-      <div className="sort-handle-cell" role={table?'cell':undefined}><button className="drag-handle" aria-label={tt`排序 ${label}.${index}`} title={t("拖动排序；也可用上下方向键调整")} disabled={items.length<2} onPointerDown={e=>start(e,index)} onKeyDown={e=>{if(active.current)return;const to=e.key==='ArrowUp'?index-1:e.key==='ArrowDown'?index+1:-1;if(to>=0&&to<items.length){e.preventDefault();reorder(index,to);requestAnimationFrame(()=>root.current?.querySelector<HTMLButtonElement>(`[data-sort-index="${to}"] .drag-handle`)?.focus());}}}><Icon name="grip"/></button></div>
+      <div className="sort-handle-cell" role={table?'cell':undefined}><button className="drag-handle" aria-label={tt`排序 ${label}.${index}`} title={t("拖动排序；也可用上下方向键调整")} disabled={disabled||items.length<2} onPointerDown={e=>start(e,index)} onKeyDown={e=>{if(active.current)return;const to=e.key==='ArrowUp'?index-1:e.key==='ArrowDown'?index+1:-1;if(to>=0&&to<items.length){e.preventDefault();reorder(index,to);requestAnimationFrame(()=>root.current?.querySelector<HTMLButtonElement>(`[data-sort-index="${to}"] .drag-handle`)?.focus());}}}><Icon name="grip"/></button></div>
       <div className="sortable-content">{renderItem(item,index)}</div>
     </div>;
   })}</div><span className="sr-only" aria-live="polite">{announcement===null?'':announcement==='cancel'?t('已取消排序'):tt`已移动到第 ${announcement} 项`}</span>

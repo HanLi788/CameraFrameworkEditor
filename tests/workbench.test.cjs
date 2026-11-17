@@ -1,4 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
+const ref=require('../electron/asset-protocol.cjs').documentReference;
 const {openTab,removeTab,moveTabs}=require('../electron/workbench.cjs');
 test('following mounts keeps rig and processor context and reuses each file tab',()=>{
  const m={tabs:[]};openTab(m,{path:'Assets/A.rig',rig:true});openTab(m,{path:'Assets/A.rig',rig:true,processor:'Smooth'});
@@ -17,25 +18,25 @@ test('transactional moves and deletes update open tabs and rig context',()=>{
 });
 test('pipeline visualization follows mounted Flow and keeps disabled stages separate',async()=>{
  const {processorPipeline,processorReferences}=await import('../src/pipelineViewModel.mjs');
- const rig={type:'Rig',path:'Assets/A.rig',data:{Pipelines:['Shared/A.pipeline'],Processors:{Smooth:['Shared/A.smooth'],Input:{Assets:['Shared/A.userInput']},Effects:[]}}};
- const p={type:'Pipeline',path:'Assets/Shared/A.pipeline',data:{Flow:['Input','Smooth'],Disabled:['Effects'],Stages:{Input:{Implementation:'Common.Input'},Smooth:{Implementation:'Common.Smooth'},Effects:{Implementation:'Common.Effects'}}}};
+ const rig={type:'Rig',path:'Assets/A.rig',data:{Pipelines:[ref('Shared/A.pipeline')],Processors:{Smooth:[ref('Shared/A.smooth')],Input:{Assets:[ref('Shared/A.userInput')]},Effects:[]}}};
+ const p={type:'Pipeline',path:'Assets/Shared/A.pipeline',documentId:'Shared/A.pipeline',data:{Flow:['Input','Smooth'],Disabled:['Effects'],Stages:{Input:{Implementation:'Common.Input'},Smooth:{Implementation:'Common.Smooth'},Effects:{Implementation:'Common.Effects'}}}};
  const model=processorPipeline([rig,p],rig.path);assert.deepEqual(model.flow.map(s=>s.name),['Input','Smooth']);assert.deepEqual(model.disabled.map(s=>s.name),['Effects']);assert.equal(model.flow[0].implementation,'Common.Input');
- assert.deepEqual(processorReferences(rig,'Input'),['Assets/Shared/A.userInput']);assert.deepEqual(processorReferences(rig,'Effects'),[]);
+ assert.deepEqual(processorReferences(rig,'Input',[{documentId:'Shared/A.userInput',path:'Assets/Shared/A.userInput'}]),['Assets/Shared/A.userInput']);assert.deepEqual(processorReferences(rig,'Effects'),[]);
 });
 
 test('invalid pipeline drafts leave a usable workbench while validation reports them',async()=>{
  const {processorPipeline}=await import('../src/pipelineViewModel.mjs');
- const assets=[{type:'Rig',path:'A.rig',data:{Pipelines:['Shared/A.pipeline']}},{type:'Pipeline',path:'Assets/Shared/A.pipeline',data:{Flow:'invalid',Disabled:42}}];
+ const assets=[{type:'Rig',path:'A.rig',data:{Pipelines:[ref('Shared/A.pipeline')]}},{type:'Pipeline',path:'Assets/Shared/A.pipeline',documentId:'Shared/A.pipeline',data:{Flow:'invalid',Disabled:42}}];
  assert.deepEqual(processorPipeline(assets,'A.rig').flow,[]);assert.deepEqual(processorPipeline(assets,'A.rig').disabled,[]);
 });
 
 test('rig choices follow pipeline spaces and show names without directory paths',async()=>{
  const {rigChoicesBySpace}=await import('../src/pipelineViewModel.mjs');
  const assets=[
-  {type:'Rig',path:'Assets/GameplayCameraSystem/Custom/Run.rig',data:{Name:'Run',Pipelines:['Shared/Action.pipeline']}},
-  {type:'Rig',path:'Assets/GameplayCameraSystem/Custom/Other.rig',data:{Name:'Run',Pipelines:['Shared/Battle.pipeline']}},
-  {type:'Pipeline',path:'Assets/Shared/Action.pipeline',data:{SpaceType:'Action'}},
-  {type:'Pipeline',path:'Assets/Shared/Battle.pipeline',data:{SpaceType:'Battle'}}
+  {type:'Rig',path:'Assets/GameplayCameraSystem/Custom/Run.rig',data:{Name:'Run',Pipelines:[ref('Shared/Action.pipeline')]}},
+  {type:'Rig',path:'Assets/GameplayCameraSystem/Custom/Other.rig',data:{Name:'Run',Pipelines:[ref('Shared/Battle.pipeline')]}},
+  {type:'Pipeline',path:'Assets/Shared/Action.pipeline',documentId:'Shared/Action.pipeline',data:{SpaceType:'Action'}},
+  {type:'Pipeline',path:'Assets/Shared/Battle.pipeline',documentId:'Shared/Battle.pipeline',data:{SpaceType:'Battle'}}
  ];
  const groups=rigChoicesBySpace(assets);
  assert.deepEqual(groups.map(g=>g.space),['Action','Battle']);
@@ -44,7 +45,7 @@ test('rig choices follow pipeline spaces and show names without directory paths'
 
 test('missing or invalid pipeline metadata keeps every rig available for repair',async()=>{
  const {rigChoicesBySpace}=await import('../src/pipelineViewModel.mjs');
- const assets=[{type:'Rig',path:'Assets/GameplayCameraSystem/Custom/Broken.rig',data:{}},{type:'Rig',path:'Assets/GameplayCameraSystem/CameraAssets/IdleCamera/Default/Default.rig',data:{Pipelines:['Shared/Invalid.pipeline']}},{type:'Pipeline',path:'Assets/Shared/Invalid.pipeline',data:{SpaceType:42}}];
+ const assets=[{type:'Rig',path:'Assets/GameplayCameraSystem/Custom/Broken.rig',data:{}},{type:'Rig',path:'Assets/GameplayCameraSystem/CameraAssets/IdleCamera/Default/Default.rig',data:{Pipelines:[ref('Shared/Invalid.pipeline')]}},{type:'Pipeline',path:'Assets/Shared/Invalid.pipeline',documentId:'Shared/Invalid.pipeline',data:{SpaceType:42}}];
  const groups=rigChoicesBySpace(assets);
  assert.deepEqual(groups.map(g=>g.space),['Idle','Unassigned']);assert.equal(groups[0].rigs[0].name,'Default');assert.equal(groups[1].rigs[0].name,'Broken');
 });

@@ -22,6 +22,7 @@ const shapes:Record<string,string>={
   'post-glass':'M9 3h6l-3 18H6Z M2 8h6l8 8h6 M17 12l4 4-4 4',
   'post-path':'M2 3l7 6-5 8 10 3 7-14 M6 9h6 M2 17h5 M12 20h4 M18 6h5',
   sidebar:'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z M9 3v18',
+  sidebarRight:'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z M15 3v18',
   collapseRight:'M15 6l-6 6 6 6',
   expandRight:'M9 6l6 6-6 6',
   'channel-anchor':'M12 3v18 M3 12h18 M8 7l4-4 4 4 M7 8l-4 4 4 4 M8 17l4 4 4-4 M17 8l4 4-4 4',

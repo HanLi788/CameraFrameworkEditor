@@ -1,11 +1,13 @@
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {Project}=require('../electron/project.cjs');
-const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework';
+const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';
 async function fixture(){
  const temp=await fs.mkdtemp(path.join(os.tmpdir(),'camera-editor-current-'));
- for(const directory of ['CameraFramework','Foundation','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),directory),path.join(temp,directory),{recursive:true});
+ for(const directory of ['CameraFramework','Foundation','DatabaseSystem','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),directory),path.join(temp,directory),{recursive:true});
  await fs.mkdir(path.join(temp,'Actor/Player'),{recursive:true});
  for(const name of ['MovementValues','PlayerEvents'])await fs.copyFile(path.join(path.dirname(source),'Actor/Player',name+'.lua'),path.join(temp,'Actor/Player',name+'.lua'));
  return Project.open(temp,path.join(temp,'data'),path.resolve('runtime/lua54.exe'));
 }
-module.exports={fixture,source};
+async function referenceFor(project,file){const index=JSON.parse((await project.read('Assets/Documents.index.json')).text);const definition=index.Documents.find(d=>'Assets/'+d.Path===file);if(!definition)throw Error('Unindexed test document: '+file);return require('../electron/asset-protocol.cjs').documentReference(definition.DocumentId);}
+async function readReference(project,ref){const index=JSON.parse((await project.read('Assets/Documents.index.json')).text);const definition=index.Documents.find(d=>d.DocumentId===ref.$ref.DocumentId);if(!definition)throw Error('Unknown test reference: '+JSON.stringify(ref));return project.read('Assets/'+definition.Path);}
+module.exports={fixture,source,referenceFor,readReference};

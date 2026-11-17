@@ -5,7 +5,7 @@ const {InputCatalog,inputIssues}=require('./input-catalog.cjs');
 const {EffectCatalog}=require('./effect-catalog.cjs');
 const {generated,writable}=require('./postprocessing.cjs');
 const { validateRuntime } = require('./validation.cjs');
-const {extensions,typeOf,assetKey,references}=require('./asset-protocol.cjs');
+const {extensions,typeOf,assetKey,references,indexPath}=require('./asset-protocol.cjs');
 const hash = text => crypto.createHash('sha256').update(text).digest('hex');
 const json = text => JSON.parse(text.replace(/^\uFEFF/, ''));
 const encode = data => JSON.stringify(data, null, 2) + '\n';
@@ -15,13 +15,6 @@ function cleanRelative(p) {
   if (typeof p !== 'string' || !p || /[\\:\x00-\x1f<>"|?*]/.test(p) || p.split('/').some(x => !x || x==='.' || x==='..' || /[. ]$/.test(x) || /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/i.test(x))) throw Error('路径必须是框架内的有效相对路径');
   return p;
 }
-function replaceReferences(data,source,destination) {
-  const result=structuredClone(data);
-  for(const ref of references(result))if(ref.path.toLowerCase()===source.toLowerCase()) {
-    let node=result;for(const part of ref.parts.slice(0,-1))node=node[part];node[ref.parts.at(-1)]=assetKey(destination);
-  }
-  return result;
-}
 class Project {
   constructor(root, storage, runtime) {this.root=root; this.workspaceRoot=path.dirname(root); this.storage=storage; this.runtime=runtime; this.inputCatalogProvider=new InputCatalog(); this.effectCatalogProvider=new EffectCatalog(); this.queue=Promise.resolve();}
   static async open(root,storage,runtime) {
@@ -30,7 +23,7 @@ class Project {
     if(!await isFramework(root))root=await fs.realpath(path.join(root,'CameraFramework')).catch(()=>{throw Error('请选择包含 CameraFramework、InputSystem、Foundation 的 Lua 工作区目录');});
     if(!await isFramework(root))throw Error('所选目录不支持当前路径资产协议，请先更新 Lua 相机框架');
     const p = new Project(root,storage,runtime);
-    for(const required of ['InputSystem/InputManager.lua','InputSystem/MyIMC/Definition/Definitions','Foundation/Math/Vector3D.lua']){
+    for(const required of ['InputSystem/InputManager.lua','InputSystem/MyIMC/Definition/Definitions','Foundation/Math/Vector3D.lua','DatabaseSystem/Database.lua','CameraFramework/Assets/Documents.index.json']){
       if(!await fs.stat(path.join(p.workspaceRoot,required)).catch(()=>null))throw Error('Lua 工作区缺少依赖：'+required);
     }
     await p.snapshot(); return p;
@@ -55,6 +48,19 @@ class Project {
   }
   async snapshot(overrides={}) {
     const files=[],directories=[''],issues=[],assets=[],seen=new Set();
+    let documentIndex={Documents:[]},indexRevision='';
+    const registeredPaths=new Map(),registeredIds=new Map();
+    try {
+      const text=Object.hasOwn(overrides,indexPath)?overrides[indexPath]:(await this.read(indexPath)).text;
+      indexRevision=hash(text||'');documentIndex=json(text);
+      if(!documentIndex||!Array.isArray(documentIndex.Documents))throw Error('文档索引 Documents 必须为数组');
+      for(const entry of documentIndex.Documents){
+        if(!entry||typeof entry.DocumentId!=='string'||!entry.DocumentId||Buffer.byteLength(entry.DocumentId)>96)throw Error('文档身份必须为 1～96 字节的字符串');
+        cleanRelative(entry.Path);const file='Assets/'+entry.Path;
+        if(registeredPaths.has(file.toLowerCase())||registeredIds.has(entry.DocumentId))throw Error('文档索引存在重复身份或文件路径：'+entry.DocumentId);
+        registeredPaths.set(file.toLowerCase(),entry);registeredIds.set(entry.DocumentId,entry);
+      }
+    }catch(e){issues.push({path:indexPath,field:'',message:'文档索引无效：'+e.message,severity:'error'});}
     const walk=async(dir='')=>{for(const d of await fs.readdir(path.join(this.root,dir),{withFileTypes:true})) {
       if(d.isSymbolicLink()||['.git','node_modules','.editor'].includes(d.name))continue;
       const rel=dir?`${dir}/${d.name}`:d.name;
@@ -70,24 +76,27 @@ class Project {
     }
     files.sort((a,b)=>a.path.localeCompare(b.path));
     for(const f of files) {
-      if(['.switchviewpointinput','.switchviewpointvalue'].includes(f.extension)){issues.push({path:f.path,field:'',severity:'error',message:'已移除的资产后缀，请迁移为 Focus / Unfocus 的 .transitionInput 与 .transitionValue'});continue;}
+      if(['.switchviewpointinput','.switchviewpointvalue'].includes(f.extension)){issues.push({path:f.path,field:'',severity:'error',message:'已移除的资产后缀，请迁移为 Enter / Change / Exit 的 .transitionInput 与 .transitionValue'});continue;}
       const type=Object.keys(extensions).find(t=>extensions[t].toLowerCase()===f.extension);if(!type)continue;
-      const asset={type,path:f.path,data:null,refs:[],revision:''};assets.push(asset);
+      const asset={type,path:f.path,documentId:registeredPaths.get(f.path.toLowerCase())?.DocumentId,data:null,refs:[],revision:''};assets.push(asset);
       try {
         cleanRelative(f.path);if(path.extname(f.path)!==extensions[type])throw Error('资产后缀大小写不符合类型约定');
         if(seen.has(f.path.toLowerCase()))throw Error('资产路径大小写冲突');seen.add(f.path.toLowerCase());
         const text=Object.hasOwn(overrides,f.path)?overrides[f.path]:(await this.read(f.path)).text;
         asset.revision=hash(text);asset.data=json(text);
         if(!asset.data||typeof asset.data!=='object'||Array.isArray(asset.data))throw Error('资产必须为 JSON 对象');
-        if(Object.hasOwn(asset.data,'Id'))throw Error('新版资产不保存根 Id，请使用相对 CameraFramework 的路径');
+        if(!asset.documentId)throw Error('文档索引未覆盖资产，请登记 Documents.index.json');
+        if(registeredPaths.get(f.path.toLowerCase()).Path!==assetKey(f.path))throw Error('文档索引路径大小写不匹配');
+        if(Object.hasOwn(asset.data,'Id'))throw Error('源资产不保存根 Id，身份来自 Documents.index.json');
         const expected=1;
         if(asset.data.SchemaVersion!==expected)throw Error(`不支持的资产版本，当前要求 ${expected}；旧结构不能仅修改版本号`);
-        asset.refs=references(asset.data);
+        asset.refs=references(asset.data,[],[],documentIndex.Documents);
       }catch(e){issues.push({path:f.path,field:'',message:e.message,severity:'error'});}
     }
     const map=new Map(assets.map(a=>[a.path,a]));
+    for(const entry of registeredIds.values())if(!map.has('Assets/'+entry.Path))issues.push({path:indexPath,field:'Documents',message:'已登记的资产文件不存在：'+entry.Path,severity:'error'});
     for(const a of assets)for(const ref of a.refs) {
-      try{cleanRelative(ref.path);const target=map.get(ref.path);if(!target)throw Error(`引用不存在（检查路径及大小写）：${ref.path}`);if(target.type!==ref.type)throw Error(`引用 ${ref.path} 应为 ${ref.type} 类型`);}
+      try{if(!registeredIds.has(ref.documentId))throw Error('引用的文档未登记：'+String(ref.documentId));if(ref.pointer!=='')throw Error('相机挂载必须引用完整文档，Pointer 必须为空字符串');cleanRelative(ref.path);const target=map.get(ref.path);if(!target)throw Error(`引用不存在（检查路径及大小写）：${ref.path}`);if(target.type!==ref.type)throw Error(`引用 ${ref.path} 应为 ${ref.type} 类型`);}
       catch(e){issues.push({path:a.path,field:ref.field,message:e.message,severity:'error'});}
     }
 
@@ -95,7 +104,7 @@ class Project {
     const effectCatalog=await this.effectCatalogProvider.read(this.workspaceRoot,this.runtime,overrides);
     issues.push(...effectCatalog.issues);
     issues.push(...inputCatalog.issues);for(const asset of assets)issues.push(...inputIssues(asset,inputCatalog));
-    return {root:this.root,workspaceRoot:this.workspaceRoot,snapshotRevision:hash(JSON.stringify([assets.map(a=>[a.path,a.revision]),inputCatalog.revision,effectCatalog.revision])),files,directories,assets,issues,inputCatalog,effectCatalog};
+    return {root:this.root,workspaceRoot:this.workspaceRoot,documentIndex,indexRevision,snapshotRevision:hash(JSON.stringify([indexRevision,assets.map(a=>[a.path,a.revision]),inputCatalog.revision,effectCatalog.revision])),files,directories,assets,issues,inputCatalog,effectCatalog};
   }
   async assertUnchanged(snapshot) {
     if((await this.snapshot()).snapshotRevision!==snapshot.snapshotRevision)throw Error('校验期间资产文件发生变化，请刷新后重试');
@@ -129,7 +138,7 @@ class Project {
       const doc=await this.read(relative);if(doc.revision!==revision)throw Error('文件已被外部修改。请重新载入或复制草稿后合并；没有覆盖磁盘内容。');
       if(typeof text!=='string'||Buffer.byteLength(text)>8*1024*1024)throw Error('文本过大');
       const asset=snap.assets.find(a=>a.path===relative);
-      if(asset||relative.endsWith('.lua'))hasAsset=true;
+      if(asset||relative===indexPath||relative.endsWith('.lua'))hasAsset=true;
       before.push([relative,doc.text]);overrides[relative]=text;
     }
     if(hasAsset){const check=await this.validate(overrides);if(check.issues.some(i=>i.severity==='error'))throw Error(check.issues.filter(i=>i.severity==='error').map(i=>i.path+' '+i.message).join('\n'));}
@@ -167,6 +176,7 @@ class Project {
       if(path.extname(destination)!==extensions[type])throw Error('新资产必须保留类型后缀');
       if(await fs.stat(await this.resolve(destination,true)).catch(()=>null))throw Error('目标文件已存在');
       const data=creating?{SchemaVersion:1,ParentType:request.parentType,...(request.parentType==='Bezier'?{P1:{X:0,Y:0},P2:{X:1/3,Y:1/3},P3:{X:2/3,Y:2/3},P4:{X:1,Y:1}}:{Points:[{X:0,Y:0,Tangent:0},{X:1,Y:1,Tangent:0}]})}:builtInBoolean?{SchemaVersion:1,Name:'NewEffect',Description:'',Reachability:'Always',BlendIn:{Duration:.2,Curve:'Shared/CurveAssets/Bezier/EaseInOut.curve'},BlendOut:{Duration:.2,Curve:'Shared/CurveAssets/Bezier/EaseInOut.curve'},Outputs:{}}:structuredClone(source.data);
+      if(builtInBoolean){const curve=snap.assets.find(a=>a.type==='Curve'&&a.documentId==='Shared/CurveAssets/Bezier/EaseInOut.curve')||snap.assets.find(a=>a.type==='Curve');if(!curve)throw Error('创建布尔效果需要共享曲线');for(const blend of [data.BlendIn,data.BlendOut])blend.Curve=require('./asset-protocol.cjs').documentReference(curve.documentId);}
       if(request.kind==='create-asset'&&Object.hasOwn(data,'Name'))data.Name=path.posix.basename(destination,path.posix.extname(destination));
       entries.push([destination,encode(data)]);
     } else if(request.kind==='move'||request.kind==='delete') {
@@ -180,8 +190,8 @@ class Project {
         destination=cleanRelative(request.path);
         if(path.extname(destination)!==extensions[source.type])throw Error('目标必须保留类型后缀');
         if(await fs.stat(await this.resolve(destination,true)).catch(()=>null))throw Error('目标已存在');
-        entries.push([destination,encode(replaceReferences(source.data,source.path,destination))]);
-        for(const a of users)entries.push([a.path,encode(replaceReferences(a.data,source.path,destination))]);
+        // A filesystem move keeps the document identity and all source references stable.
+        entries.push([destination,doc.text]);
       }
       entries.push([source.path,null]);
     } else throw Error('未知资产操作');
@@ -189,7 +199,7 @@ class Project {
       const rel=path.posix.join(path.posix.dirname(destination),folder,'.gitkeep');
       if(!await fs.stat(await this.resolve(rel,true)).catch(()=>null))entries.push([rel,'']);
     }
-    await require('./manifest.cjs').registerChanges(this,entries,snap);
+    await require('./manifest.cjs').registerChanges(this,entries,snap,{moves:request.kind==='move'?{[source.path]:destination}:{},copies:request.kind==='copy'||request.kind==='create-asset'&&source?{[source.path]:destination}:{}});
     const check=await this.validate(Object.fromEntries(entries));
     if(check.issues.some(i=>i.severity==='error'))throw Error(check.issues.filter(i=>i.severity==='error').map(i=>i.path+' '+i.message).join('\n'));
 

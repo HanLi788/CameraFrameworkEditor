@@ -10,10 +10,10 @@ test('numeric effects save current source/domain/smoothing and reject obsolete e
  const doc=await project.read(post),data=JSON.parse(doc.text);data.Domain='[0,1000]';data.Outputs={ExposureCompensation:{Range:'{2}'}};data.SmoothTime=.2;
  const saved=await project.save({...doc,text:encode(data)});assert.deepEqual(JSON.parse(saved.text),data);for(const field of ['Events','Mode','Priority']){await assert.rejects(()=>project.save({...saved,text:encode({...data,[field]:field==='Events'?[]:1})}));}await project.save({...saved,text:doc.text});
 });
-test('filter rename rewrites root mounts and selected key in one transaction',async()=>{
- const source='Assets/PostProcessingSystem/Filter/Natural.filter',destination='Assets/PostProcessingSystem/Filter/NaturalRenamed.filter',s=await project.snapshot();
+test('filter rename preserves root mounts and selected document identity in one transaction',async()=>{
+ const before=await project.read('Assets/PostProcessingSystem/Framework.postProcessing');const source='Assets/PostProcessingSystem/Filter/Natural.filter',destination='Assets/PostProcessingSystem/Filter/NaturalRenamed.filter',s=await project.snapshot();
  await project.mutate({kind:'move',sourcePath:source,path:destination,sourceRevision:(await project.read(source)).revision,snapshotRevision:s.snapshotRevision});
- const root=JSON.parse((await project.read('Assets/PostProcessingSystem/Framework.postProcessing')).text);assert.equal(root.Processors.Filter.CurrentAssetKey,destination.slice(7));assert.ok(root.Processors.Filter.Assets.some(m=>m.Asset===destination.slice(7)));assert.deepEqual((await project.validate()).issues,[]);
+ const root=JSON.parse((await project.read('Assets/PostProcessingSystem/Framework.postProcessing')).text);assert.deepEqual(root,JSON.parse(before.text));assert.ok(root.Processors.Filter.Assets.some(m=>m.Asset.$ref.DocumentId===root.Processors.Filter.CurrentAssetKey.$ref.DocumentId));assert.deepEqual((await project.validate()).issues,[]);
  await project.mutate({kind:'move',sourcePath:destination,path:source,sourceRevision:(await project.read(destination)).revision,snapshotRevision:(await project.snapshot()).snapshotRevision});
 });
 test('filter creation and deletion update the root mount without generated plans',async()=>{

@@ -1,4 +1,4 @@
-# CameraFrameworkEditor · 相机框架编辑器 v0.6.0
+# CameraFrameworkEditor · 相机框架编辑器 v0.7.2
 
 独立 Windows 桌面编辑器，直接编辑所选 Lua 工作区中的相机资产。当前接入 `GameplayCameraSystem`、`PostProcessingSystem` 与 `Shared` 三份 Framework 入口，资产协议统一为版本 1。
 
@@ -12,18 +12,25 @@ npm.cmd run build
 npm.cmd start
 ```
 
-已有发布包时，运行 `release/win-unpacked/相机框架编辑器.exe`。免安装目录应整体复制；安装包位于 `release/CameraFrameworkEditor-0.6.0-Setup.exe`。发布包包含 Lua 与 Electron，使用者无需安装 Node.js 或 UE。
+已有发布包时，运行 `release/win-unpacked/相机框架编辑器.exe`。免安装目录应整体复制；安装包位于 `release/CameraFrameworkEditor-0.7.2-Setup.exe`。发布包包含 Lua 与 Electron，使用者无需安装 Node.js 或 UE。
 
-启动后选择包含 `CameraFramework`、`Foundation`、`InputSystem` 的 Lua 目录，也可直接选择其中的 `CameraFramework`。目录位置由用户选择，不依赖工具所在盘符。
+启动后选择包含 `CameraFramework`、`Foundation`、`DatabaseSystem`、`InputSystem` 的 Lua 目录，也可直接选择其中的 `CameraFramework`。目录位置由用户选择，不依赖工具所在盘符。
 
 ## 资产与路径
 
-内容浏览器中的文件路径相对于 `CameraFramework/`，JSON 内的资产引用相对于 `CameraFramework/Assets/`：
+内容浏览器中的文件路径相对于 `CameraFramework/`。`Assets/Documents.index.json` 将稳定的文档身份映射到磁盘文件；源资产中的挂载与选择均使用完整文档引用：
 
-```text
-文件：Assets/Shared/CurveAssets/Bezier/Linear.curve
-引用：Shared/CurveAssets/Bezier/Linear.curve
+```json
+{"$ref":{"DocumentId":"Camera/ActionCamera/Dash/Dash.rig","Pointer":""}}
 ```
+
+对应索引登记为：
+
+```json
+{"DocumentId":"Camera/ActionCamera/Dash/Dash.rig","Path":"GameplayCameraSystem/CameraAssets/ActionCamera/Dash/Dash.rig"}
+```
+
+共享和后处理身份分别使用 `Shared/`、`PostProcessingSystem/` 命名空间，相机身份使用 `Camera/`。移动或重命名只更新索引的 Path，保留 DocumentId 和引用内容；复制分配新身份，复制目录内的互相引用同步指向副本。禁止旧路径字符串挂载及非空 Pointer。
 
 | 用途 | 文件后缀 |
 |---|---|
@@ -34,24 +41,28 @@ npm.cmd start
 | 相机参数 | `.range`、`.sensitivity`、`.smooth`、`.occlusion`、`.effect`、`.curve` |
 | 后处理环境、数值效果、布尔效果、滤镜 | `.virtualInput`、`.numEffect`、`.boolEffect`、`.filter` |
 
-三个入口分别为 `Assets/Shared/Framework.share`、`Assets/GameplayCameraSystem/Framework.camera`、`Assets/PostProcessingSystem/Framework.postProcessing`。所有交付资产必须从入口可达。共享资产位于 `Shared/`；其他资产按所属系统放置。
+三个入口分别为 `Assets/Shared/Framework.share`、`Assets/GameplayCameraSystem/Framework.camera`、`Assets/PostProcessingSystem/Framework.postProcessing`。全部资产必须登记到文档索引；共享资产还需登记到共享入口。其他资产按所属系统放置，装置和后处理挂载由各自入口维护。
 
 ## 编辑与保存
 
 - 左侧仅显示文件夹，默认收起，用于选择内容目录；文件操作集中在底部内容浏览器。目录导航不提供右键操作。
 - 内容浏览器用紧凑图标展示文件夹与资产，支持全局搜索、当前目录类型筛选、图标大小、面板高度调整和“当前处理器挂载”筛选。双击或 Enter 打开；右键新建、复制、粘贴、重命名、移动、删除和查看引用。拖拽资产可替换挂载，拖到浏览器中的文件夹可移动文件。
-- 上方先选择空间，再从该空间选择装置；从内容浏览器或文件标签打开装置时同步两个下拉框。装置列表显示名称，悬停可查看完整路径。按所挂载 `.pipeline` 的 `Flow` 显示真实执行顺序，禁用阶段单独显示。点击处理器编辑 `.rig.Processors` 中对应部分；“装置设置”编辑公共范围和管线挂载。
-- 中间为文件标签页。点击挂载资产的名称或图标，在当前窗口打开对应文件；同一路径重复打开会聚焦已有标签。切换到挂载资产时，当前装置和处理器保持不变。替换与移除挂载使用独立操作。
+- 右侧先选择空间，再从该空间选择装置；从内容浏览器或文件标签打开装置时同步两个下拉框。装置列表显示名称，悬停可查看完整路径。处理器按所挂载 `.pipeline` 的 `Flow` 竖向显示真实执行顺序，停用阶段独立折叠。点击处理器编辑 `.rig.Processors` 中对应部分；“装置设置”编辑公共范围和管线挂载。
+- 主区域从文件标签页直接展开资产详情，底部内容浏览器仅占主区域宽度，右侧导航贯穿工作区高度。右栏默认 240px，支持拖动或方向键调宽、收起，并保存布局；工具栏、状态栏和视图菜单均可重新打开。窗口宽度小于 1200px 时自动收起左侧目录，也可通过工具栏临时展开。
+- 主区域保留文件标签页。点击挂载资产的名称或图标，在当前窗口打开对应文件；同一路径重复打开会聚焦已有标签。切换到挂载资产时，当前装置和处理器保持不变。替换与移除挂载使用独立操作。
+- 详情区采用嵌入式布局：参数表直接使用主区域宽度，分组通过标题、行分隔和少量缩进区分；资产挂载以紧凑行显示，曲线引用通过悬停或键盘聚焦预览。
 - 详情支持表单与源码切换、撤销、重做。同一文件的处理器表单和源码共享一份草稿；源码始终展示完整文件。共享标记显示受影响的装置，引用操作可查看上下游依赖。磁盘冲突保留草稿并提示重新载入。
 - 相机表单包含 15 个直接字段：`AnchorOffsetX/Y/Z`、`RotationPitch/Yaw/Roll`、`Distance`、`FOV`、`AspectRatio`、`OrthoWidth`、`OffCenterOffsetX/Y`、`PerspectiveNearClipPlane`、`OrthoNearClipPlane`、`OrthoFarClipPlane`。关闭通道也需要完整配置。
-- 装置输入仅挂载 `Assets`（用户输入）、`Focus` 和 `Unfocus`。Focus/Unfocus 均引用 `.transitionInput`；旧 Enter/Exit/SwitchViewpoint 配置和切换输入、切换值后缀已移除。
-- Focus 的 `ValueAssets` 挂载至少一个专用 `.transitionValue`，禁止默认目标；Unfocus 必须通过 `DefaultValueAsset` 挂载不声明表现类型的默认值，专用 `ValueAssets` 可以为空。表单按用途筛选候选，点击名称打开文件标签，替换与移除独立操作。
+- Actor 装置输入使用 `Assets`（用户输入）、`Enter`、`Change`、`Exit`。三类过渡入口均引用 `.transitionInput`，在表单中分别编辑；旧 Focus/Unfocus/SwitchViewpoint 输入字段被拒绝。Focus/Unfocus 仅保留为值资产目录。
+- Enter 和 Change 的 `ValueAssets` 挂载至少一个专用 `.transitionValue`，禁止默认目标；Exit 必须通过 `DefaultValueAsset` 挂载不声明表现类型的默认值，专用 `ValueAssets` 可以为空。表单按用途筛选候选，点击名称打开文件标签，替换与移除独立操作。
 - 专用目标使用 `PerformanceType = {BaseName, CodeName?}`。BaseName 格式为 `PERFORMANCE_[A-Z0-9_]+`，CodeName 可省略，提供时必须为非空字符串。匹配与重复检查比较完整二元组合；`10001` 和 `010001` 是不同代码，省略代码不表示通配。表现标识按字面量保存，即使代码形似资产路径，也不会参与引用扫描或移动重写。
 - 过渡时长、通道和曲线保存在目标值文件中，输入文件仅选择候选目标。基础表现类别使用下拉框，选项来自当前工作区 `GameplayCameraSystem/Adaptation/ActorPerformance.lua` 的 `PerformanceTypes` 映射；显示易读名称与原始标识，已有自定义类别保留并标注。映射随源码变更刷新，也可点击刷新按钮重新读取。配置代码仍以文本编辑，默认目标禁止声明表现类型。
+- Roam／Sequence 使用 Enter、Exit 两类输入，按正整数 `SequenceId` 匹配目标，不声明表现类型或默认目标。值和平滑表单使用 14 个直接位姿通道，包含 `LocationX/Y/Z`，不含锚点偏移和距离；管线固定为 Input → Smooth。
+- Actor 值通道的参考系可选择 `CurrentViewpoint|default` 或标准插槽，例如 `CurrentViewpoint|socket_chest`；“使用插槽旋转”编辑 `bUseSocketRotation`。切换到其他参考系会移除不适用的插槽旋转字段。
 - 效果对象、接口、参数声明和后处理通道目录从所选工作区读取。基本相机效果与后处理数值效果分别使用自己的接口注册表。
 - 后处理环境、布尔效果和滤镜编辑固定通道值；数值效果编辑来源、定义域、平滑时间和稀疏映射。框架容器通过普通详情编辑挂载、上下文和滤镜选择。事件绑定由 Lua 导演完成。
-- Ctrl+W 关闭当前标签，Ctrl+B 显示或隐藏目录，Ctrl+J 显示或隐藏内容浏览器。Ctrl+S 保存当前文件，“全部保存”提交全部草稿。保存先通过当前框架的 `Editor.Workspace` 检查源协议、引用、三入口覆盖及展开结果，成功后写入。后处理不再生成独立执行计划。
-- 新建或复制资产时，选择对应所有权目录；编辑器在同一事务中补充入口登记。移动、重命名会同步引用与入口；被其他资产使用的文件不能直接删除。Lua 业务代码中的字符串路径仍需自行同步。
+- Ctrl+W 关闭当前标签，Ctrl+B 显示或隐藏目录，Ctrl+J 显示或隐藏内容浏览器。左右栏和内容浏览器都可独立收起，“重置布局”恢复默认尺寸与可见性。Ctrl+S 保存当前文件，“全部保存”提交全部草稿。保存先通过当前框架的 `Editor.Workspace` 检查源协议、引用、三入口覆盖及展开结果，成功后写入。后处理不再生成独立执行计划。
+- 新建或复制资产时，选择对应所有权目录；编辑器在同一事务中补充文档索引及入口登记。移动、重命名保留文档身份并更新索引；被其他资产使用的文件不能直接删除。业务代码使用的文档身份不随磁盘文件移动而改变；副本使用新的身份。
 - 修改前保留恢复副本；写入失败会恢复已写文件。外部文件变化会阻止覆盖。关闭未保存的标签时可选择保留或丢弃草稿，切换项目或退出应用会检查未保存内容。
 
 保存资产后，重新启动 UE PIE 加载参数。
@@ -63,14 +74,14 @@ npm.cmd start
 ## 验证
 
 ```powershell
-$env:CAMERA_FRAMEWORK_TEST_ROOT = 'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework'
+$env:CAMERA_FRAMEWORK_TEST_ROOT = 'F:/MyWorks/Lua/CameraFramework'
 npm.cmd test
 npm.cmd run build
 node tests/current-protocol-ui.cjs
 node tests/current-protocol-ui.cjs --packaged
 ```
 
-测试在临时工作区副本中运行，不修改原项目。UI 回归覆盖文件夹导航、15 通道表单、类型化引用、真实保存、后处理编辑、处理器管线、挂载资产标签页、内容浏览器事务与项目校验。
+测试在临时工作区副本中运行，不修改原项目。UI 回归覆盖文档引用、文件夹导航、15 通道表单与 Roam 的 14 通道表单、SequenceId、插槽参考、类型化引用、真实保存、后处理编辑、处理器管线、挂载资产标签页、内容浏览器事务与项目校验。
 
 ## 用户数据
 

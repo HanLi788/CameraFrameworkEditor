@@ -1,6 +1,6 @@
 const {test,before}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path');
-const {fixture}=require('./framework-fixture.cjs'),{encode,cleanRelative,references}=require('../electron/project.cjs');
-const {assetKey}=require('../electron/asset-protocol.cjs');let project;
+const {fixture,referenceFor}=require('./framework-fixture.cjs'),{encode,cleanRelative,references}=require('../electron/project.cjs');
+const {documentReference,documentId}=require('../electron/asset-protocol.cjs');let project;
 before(async()=>{project=await fixture();});
 const mutate=async request=>project.mutate({...request,snapshotRevision:(await project.snapshot()).snapshotRevision});
 test('current workspace opens from Lua or CameraFramework and validates every asset with real Lua',async()=>{
@@ -40,17 +40,17 @@ test('copy and delete register auxiliary assets transactionally in their owner m
  const a=(await project.snapshot()).assets.find(a=>a.type==='Smooth'),destination='Assets/GameplayCameraSystem/EditorTests/Extra.smooth';
  const before=await project.read('Assets/GameplayCameraSystem/Framework.camera');
  await mutate({kind:'copy',sourcePath:a.path,path:destination});assert.deepEqual((await project.validate()).issues,[]);
- assert.ok(JSON.parse((await project.read(before.path)).text).Assets.includes(assetKey(destination)));
+ assert.ok(JSON.parse((await project.read(before.path)).text).Assets.some(ref=>documentId(ref)===require('../electron/manifest.cjs').newIdentity(destination)));
  await mutate({kind:'delete',sourcePath:destination,sourceRevision:(await project.read(destination)).revision});assert.deepEqual(JSON.parse((await project.read(before.path)).text),JSON.parse(before.text));
 });
-test('shared curve moves update manifests and every raw Assets-relative reference',async()=>{
+test('shared curve moves update indexed paths and preserve all references',async()=>{
  const source='Assets/Shared/CurveAssets/Bezier/Linear.curve',destination='Assets/Shared/CurveAssets/Bezier/LinearRenamed.curve',before=await project.read(source);
  await mutate({kind:'move',sourcePath:source,path:destination,sourceRevision:before.revision});const s=await project.snapshot();assert.ok(s.assets.some(a=>a.refs.some(ref=>ref.path===destination)));assert.deepEqual((await project.validate()).issues,[]);
  await mutate({kind:'move',sourcePath:destination,path:source,sourceRevision:(await project.read(destination)).revision});assert.deepEqual(JSON.parse((await project.read(source)).text),JSON.parse(before.text));
 });
-test('moving a Focus input updates the Focus mount and preserves the user input list',async()=>{
- const source='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/InputAssets/Dash_Focus.transitionInput',destination='Assets/GameplayCameraSystem/EditorTests/Focus.transitionInput',rig='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/Dash.rig',before=await project.read(rig);
- await mutate({kind:'move',sourcePath:source,path:destination,sourceRevision:(await project.read(source)).revision});const data=JSON.parse((await project.read(rig)).text);assert.equal(data.Processors.Input.Focus,assetKey(destination));assert.deepEqual(data.Processors.Input.Assets,JSON.parse(before.text).Processors.Input.Assets);
+test('moving an Enter input preserves its document identity and preserves the user input list',async()=>{
+ const source='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/InputAssets/Dash_Enter.transitionInput',destination='Assets/GameplayCameraSystem/EditorTests/Enter.transitionInput',rig='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/Dash.rig',before=await project.read(rig);
+ await mutate({kind:'move',sourcePath:source,path:destination,sourceRevision:(await project.read(source)).revision});const data=JSON.parse((await project.read(rig)).text);assert.deepEqual(data.Processors.Input.Enter,JSON.parse(before.text).Processors.Input.Enter);assert.deepEqual(await referenceFor(project,destination),data.Processors.Input.Enter);assert.deepEqual(data.Processors.Input.Assets,JSON.parse(before.text).Processors.Input.Assets);
  await mutate({kind:'move',sourcePath:destination,path:source,sourceRevision:(await project.read(destination)).revision});assert.deepEqual(JSON.parse((await project.read(rig)).text),JSON.parse(before.text));
 });
 test('referenced definitions cannot be deleted and stale mutations do not write',async()=>{
@@ -63,14 +63,14 @@ test('failed multi-file move restores source and all dependents',async()=>{
  try{await assert.rejects(()=>mutate({kind:'move',sourcePath:a.path,path:'Assets/GameplayCameraSystem/EditorTests/Failure.transitionInput',sourceRevision:a.revision}),/injected move/);}finally{project.atomic=atomic;}
  for(const d of docs)assert.equal((await project.read(d.path)).text,d.text);
 });
-test('folder moves rewrite shared references and preserve ordinary files',async()=>{
+test('folder moves preserve document identities and ordinary files',async()=>{
  const source='Assets/GameplayCameraSystem/EditorFolder',destination='Assets/GameplayCameraSystem/EditorMoved',a=(await project.snapshot()).assets.find(a=>a.type==='Smooth');
  await mutate({kind:'create-directory',path:source});await mutate({kind:'copy',sourcePath:a.path,path:source+'/Copied.smooth'});await fs.writeFile(path.join(project.root,source,'notes.md'),'notes');
  await mutate({kind:'move',sourcePath:source,path:destination});assert.equal((await project.read(destination+'/notes.md')).text,'notes');assert.deepEqual((await project.validate()).issues,[]);
  await mutate({kind:'move',sourcePath:destination,path:source});await mutate({kind:'delete',sourcePath:source+'/Copied.smooth',sourceRevision:(await project.read(source+'/Copied.smooth')).revision});
 });
-test('reference discovery distinguishes raw keys from file paths and ignores Params and prose',()=>{
- const refs=references({Description:'Shared/fake.curve',Source:{Params:['Shared/fake.curve']},Ranges:['GameplayCameraSystem/a.range'],Focus:'GameplayCameraSystem/a.transitionInput',ValueAssets:['GameplayCameraSystem/a.transitionValue'],PerformanceType:{BaseName:'PERFORMANCE_NPC',CodeName:'Shared/fake.curve'},CurrentAssetKey:'PostProcessingSystem/Filter/A.filter'});
+test('reference discovery reads document identities and ignores Params and prose',()=>{
+ const refs=references({Description:'Shared/fake.curve',Source:{Params:['Shared/fake.curve']},Ranges:[documentReference('Camera/a.range')],Enter:documentReference('Camera/a.transitionInput'),ValueAssets:[documentReference('Camera/a.transitionValue')],PerformanceType:{BaseName:'PERFORMANCE_NPC',CodeName:'Shared/fake.curve'},CurrentAssetKey:documentReference('PostProcessingSystem/Filter/A.filter')});
  assert.deepEqual(refs.map(r=>r.type),['Range','TransitionInput','Value','Filter']);assert.ok(refs.every(r=>r.path.startsWith('Assets/')));
 });
 test('new rig copies are registered for execution and can be removed when unused',async()=>{

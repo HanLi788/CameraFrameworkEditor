@@ -1,3 +1,4 @@
+import {assetReference} from './assetPaths.mjs';
 // Form feedback only. Saving and playback use the workspace's Lua validators.
 const trim = text => text.replace(/^[\t\n\v\f\r ]+|[\t\n\v\f\r ]+$/g, '');
 const decimal = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
@@ -44,5 +45,5 @@ export function constantEffectSet(text, output = false) {
 }
 export function effectOutputTemplate(domain, assets) {
   const curve = assets.find(a => a.type === 'Curve' && a.path === 'Assets/Shared/CurveAssets/Bezier/Linear.curve') || assets.find(a => a.type === 'Curve');
-  return constantEffectSet(domain) || !curve ? {Type:'Scalar',Range:'{0}'} : {Type:'Scalar',Range:'[0,1]', Curve:curve.path.replace(/^Assets\//,'')};
+  return constantEffectSet(domain) || !curve ? {Type:'Scalar',Range:'{0}'} : {Type:'Scalar',Range:'[0,1]', Curve:assetReference(curve.path,assets)};
 }

@@ -4,7 +4,7 @@ const literal=text=>{let delimiter='====';while(text.includes(']'+delimiter+']')
 async function collect(workspace){
  const modules={},files={};
  async function walk(dir,prefix){for(const entry of (await fs.readdir(dir,{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name))){if(entry.isSymbolicLink())continue;if(entry.isDirectory()){if(entry.name!=='Test')await walk(path.join(dir,entry.name),prefix+'.'+entry.name);}else if(entry.name.endsWith('.lua'))modules[prefix+'.'+entry.name.slice(0,-4)]=await fs.readFile(path.join(dir,entry.name),'utf8');}}
- await walk(path.join(workspace,'Foundation'),'Foundation');await walk(path.join(workspace,'CameraFramework'),'CameraFramework');
+ await walk(path.join(workspace,'Foundation'),'Foundation');await walk(path.join(workspace,'CameraFramework'),'CameraFramework');await walk(path.join(workspace,'DatabaseSystem'),'DatabaseSystem');
  return {modules,files};
 }
 function run(runtime,script){return new Promise(resolve=>{

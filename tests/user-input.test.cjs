@@ -3,8 +3,8 @@ const {Project,encode}=require('../electron/project.cjs'),{InputCatalog}=require
 let project,dir,definitions,original;
 const file='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Run/InputAssets/Run_User.userInput',runtime=path.resolve('runtime/lua54.exe');
 before(async()=>{
- dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-user-input-'));const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework';
- for(const name of ['CameraFramework','Foundation','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),name),path.join(dir,name),{recursive:true});
+ dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-user-input-'));const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';
+ for(const name of ['CameraFramework','Foundation','DatabaseSystem','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),name),path.join(dir,name),{recursive:true});
  for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor/Player',name+'.lua'),path.join(dir,'Actor/Player',name+'.lua'));
  definitions=path.join(dir,'InputSystem/MyIMC/Definition/Definitions');original=JSON.parse(await fs.readFile(path.join(definitions,'ActionCamera.json'),'utf8'));
  project=await Project.open(dir,path.join(dir,'data'),runtime);

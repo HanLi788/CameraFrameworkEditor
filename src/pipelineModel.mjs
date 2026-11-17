@@ -1,15 +1,17 @@
+import {assetFile} from './assetPaths.mjs';
 export const baseStages=['Input','Effects','Render','Occlusion','Smooth'];
 export const stageLabels={Input:'输入',Effects:'效果',Render:'渲染目标',Occlusion:'遮挡',Smooth:'平滑',Subject:'主体',Evaluation:'评估'};
-export const implementations=space=>[...baseStages.map(name=>'Common.'+name),...(space==='Battle'?['Battle.Subject','Battle.Evaluation']:[])];
+export const implementations=space=>space==='Roam'?['Common.Input','Common.Smooth']:[...baseStages.map(name=>'Common.'+name),...(space==='Battle'?['Battle.Subject','Battle.Evaluation']:[])];
 const requires={'Common.Occlusion':['Render'],'Battle.Evaluation':['Subject']};
 export function pipelineProblems(data){
   const errors=[];
   if(data.SchemaVersion!==1)errors.push(['管线资产版本必须为 1','']);
   if(!data.Stages||typeof data.Stages!=='object'||Array.isArray(data.Stages)||!Array.isArray(data.Flow)||!Array.isArray(data.Disabled))return [['管线结构无效，请在源码中修复','']];
   const all=[...data.Flow,...data.Disabled],allowed=implementations(data.SpaceType);
-  if(!['Action','Battle','Idle','Interactive','Preview'].includes(data.SpaceType))errors.push(['未知相机空间类型：',String(data.SpaceType)]);
+  if(!['Action','Battle','Idle','Interactive','Preview','Roam'].includes(data.SpaceType))errors.push(['未知相机空间类型：',String(data.SpaceType)]);
+  if(data.SpaceType==='Roam'&&(JSON.stringify(data.Flow)!==JSON.stringify(['Input','Smooth'])||data.Disabled.length||Object.keys(data.Stages).some(name=>!['Input','Smooth'].includes(name))))errors.push(['序列管线必须为 Input → Smooth，且不可禁用阶段','']);
   if(!data.Flow.length)errors.push(['管线至少需要一个启用阶段','']);
-  for(const name of new Set([...baseStages,...Object.keys(data.Stages),...all])){
+  for(const name of new Set([...(data.SpaceType==='Roam'?['Input','Smooth']:baseStages),...Object.keys(data.Stages),...all])){
     if(!data.Stages[name]||all.filter(n=>n===name).length!==1){errors.push(['阶段必须声明且只归属一个列表：',String(name)]);continue;}
     const stage=data.Stages[name];
     if(!allowed.includes(stage.Implementation))errors.push(['当前空间未注册此实现：',String(stage.Implementation)]);
@@ -26,11 +28,20 @@ export function toggleStage(data,name,enabled){
   if(enabled){const at=name==='Smooth'?-1:next.Flow.indexOf('Smooth');if(at<0)next.Flow.push(name);else next.Flow.splice(at,0,name);}else next.Disabled.push(name);
   return next;
 }
+export function changePipelineSpace(data,space){
+ if(space===data.SpaceType)return data;
+ if(space==='Roam')return {...data,SpaceType:space,Stages:{Input:{Implementation:'Common.Input'},Smooth:{Implementation:'Common.Smooth'}},Flow:['Input','Smooth'],Disabled:[]};
+ const allowed=implementations(space),Stages=Object.fromEntries(Object.entries(data.Stages||{}).filter(([,stage])=>allowed.includes(stage.Implementation)));
+ for(const name of baseStages)Stages[name]??={Implementation:'Common.'+name};
+ const Disabled=(data.Disabled||[]).filter(name=>Object.hasOwn(Stages,name)),Flow=(data.Flow||[]).filter(name=>Object.hasOwn(Stages,name));
+ for(const name of Object.keys(Stages))if(!Flow.includes(name)&&!Disabled.includes(name)){const at=Flow.indexOf('Smooth');if(at<0||name==='Smooth')Flow.push(name);else Flow.splice(at,0,name);}
+ return {...data,SpaceType:space,Stages,Flow,Disabled};
+}
 export function pipelineImpact(data,path,assets){
   if(!Array.isArray(data.Flow))return [];
-  return assets.filter(a=>a.type==='Rig'&&a.data?.Pipelines?.includes(path.replace(/^Assets\//,''))).map(a=>{
+  return assets.filter(a=>a.type==='Rig'&&a.data?.Pipelines?.some(ref=>assetFile(ref,assets)===path)).map(a=>{
     const processors=a.data.Processors||{},missing=data.Flow.filter(n=>!Object.hasOwn(processors,n)),extra=Object.keys(processors).filter(n=>!data.Flow.includes(n));
-    const space=/^Assets\/GameplayCameraSystem\/CameraAssets\/(Action|Battle|Idle|Interactive|Preview)Camera\//.exec(a.path)?.[1];
+    const space=/^Assets\/GameplayCameraSystem\/CameraAssets\/(Action|Battle|Idle|Interactive|Preview|Roam)Camera\//.exec(a.path)?.[1];
     return {path:a.path,missing,extra,spaceMismatch:!!space&&space!==data.SpaceType};
   }).filter(a=>a.missing.length||a.extra.length||a.spaceMismatch);
 }

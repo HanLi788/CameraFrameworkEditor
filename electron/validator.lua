@@ -35,13 +35,15 @@ local function quote(value)
  end)..'"'
 end
 local checked=0
+local workspace
 local ok,message=pcall(function()
  local Workspace=require('CameraFramework.Editor.Workspace')
- local workspace=Workspace.New({Root='__editor__/Assets',ReadText=function(file)return assert(bundle.files[file],'Missing asset: '..file)end})
+ workspace=Workspace.New({SourceRoot='__editor__/Assets',ReadText=function(file)return bundle.files[file]end})
  -- Check source-only fields before execution configuration drops diagnostic extras.
  local original=workspace.OnSource
  function workspace:OnSource(file,raw)
   original(self,file,raw)
+  raw=require('CameraFramework.Documents').Project(raw)
   local Validator=require('Foundation.Validation.ValueValidator')
   local allowed=file:match('%.sensitivity$') and {Type=true,bEnabled=true,EscapeCurve=true,ReturnCurve=true}
    or file:match('%.smooth$') and {Type=true,bEnabled=true,SpeedRange=true,MaxLag=true,ResponseCurve=true}
@@ -50,8 +52,9 @@ local ok,message=pcall(function()
  end
  workspace:Build()
  for _,asset in ipairs(bundle.assets)do
-  local key=asset.path:match('^Assets/(.*)$')
-  if key and Workspace.IsAsset(key)then assert(workspace.Files[key],'Framework 未覆盖资产：'..key);checked=checked+1 end
+  local key=asset.documentId
+  if key and Workspace.IsAsset(key)then workspace:Load(key);checked=checked+1 end
  end
 end)
+if workspace then pcall(workspace.Destroy,workspace) end
 io.write('EDITOR_RESULT:{"checked":'..checked..',"issues":['..(ok and '' or '{"path":"","severity":"error","message":'..quote(message)..'}')..']}\n')

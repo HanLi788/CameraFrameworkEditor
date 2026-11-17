@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=r
 const {Project,encode}=require('../electron/project.cjs');
 const {Documents}=require('../electron/documents.cjs');
 let p,store,snap,temp;
-before(async()=>{temp=await fs.mkdtemp(path.join(os.tmpdir(),'camera-editor-shared-'));const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework';await fs.cp(source,path.join(temp,'CameraFramework'),{recursive:true});await fs.cp(path.join(path.dirname(source),'EventBus'),path.join(temp,'EventBus'),{recursive:true});await fs.cp(path.join(path.dirname(source),'Foundation'),path.join(temp,'Foundation'),{recursive:true});await fs.cp(path.join(path.dirname(source),'InputSystem'),path.join(temp,'InputSystem'),{recursive:true});for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor','Player',name+'.lua'),path.join(temp,'Actor','Player',name+'.lua'));p=await Project.open(path.join(temp,'CameraFramework'),path.join(temp,'data'),path.resolve('runtime/lua54.exe'));store=new Documents(p);snap=await p.snapshot();console.log('Shared-document fixture:',temp);});
+before(async()=>{p=await require('./framework-fixture.cjs').fixture();temp=p.workspaceRoot;store=new Documents(p);snap=await p.snapshot();});
 const rigPath='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/Dash.rig';
 test('creates both curve parent types in a user-chosen directory without a template',async()=>{
   for(const parentType of ['Bezier','CubicHermiteSpline']){const current=await p.snapshot(),relative='Assets/GameplayCameraSystem/Custom/曲线/'+parentType+'.curve';await p.mutate({kind:'create-curve',path:relative,parentType,snapshotRevision:current.snapshotRevision});const data=JSON.parse((await p.read(relative)).text);assert.equal(data.Id,undefined);assert.equal(data.ParentType,parentType);assert.equal((await p.snapshot()).assets.find(a=>a.path===relative).path,relative);}
@@ -18,9 +18,9 @@ test('saving a curve updates the same file without creating assets or changing r
 });
 test('replacing a curve reference saves only the parent and leaves curve definitions unchanged',async()=>{
   const a=snap.assets.find(a=>a.path==='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/SmoothAssets/Dash_Default.smooth'),d=await store.ensure(a.path),parts=['Channels','Distance','ResponseCurve'],sourcePath=JSON.parse(d.text).Channels.Distance.ResponseCurve;
-  const sources=await Promise.all(['Assets/Shared/CurveAssets/Bezier/Linear.curve',sourcePath].map(file=>p.read(file.startsWith('Assets/')?file:'Assets/'+file)));
-  store.editField({path:d.path,parts,value:'Shared/CurveAssets/Bezier/Linear.curve',baseValue:sourcePath});await store.save({paths:[d.path],versions:{[d.path]:d.version}});
-  assert.equal(JSON.parse((await p.read(d.path)).text).Channels.Distance.ResponseCurve,'Shared/CurveAssets/Bezier/Linear.curve');for(const old of sources)assert.equal((await p.read(old.path)).text,old.text);
+  const sources=await Promise.all(['Assets/Shared/CurveAssets/Bezier/Linear.curve',sourcePath].map(file=>p.read(typeof file==='string'?file:(snap.assets.find(a=>a.documentId===file.$ref.DocumentId).path))));
+  store.editField({path:d.path,parts,value:require('../electron/asset-protocol.cjs').documentReference('Shared/CurveAssets/Bezier/Linear.curve'),baseValue:sourcePath});await store.save({paths:[d.path],versions:{[d.path]:d.version}});
+  assert.deepEqual(JSON.parse((await p.read(d.path)).text).Channels.Distance.ResponseCurve,require('../electron/asset-protocol.cjs').documentReference('Shared/CurveAssets/Bezier/Linear.curve'));for(const old of sources)assert.equal((await p.read(old.path)).text,old.text);
 });
 test('invalid shared curve edits are rejected with no disk change and keep the draft',async()=>{
   const a=snap.assets.find(a=>a.path==='Assets/Shared/CurveAssets/Bezier/Linear.curve'),d=await store.ensure(a.path),before=await p.read(d.path),data=JSON.parse(d.text);data.P4.Y=0;

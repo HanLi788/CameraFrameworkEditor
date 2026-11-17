@@ -4,13 +4,13 @@ const {spawnSync}=require('node:child_process');
 const {Project,encode}=require('../electron/project.cjs');
 const {Documents}=require('../electron/documents.cjs');
 
-const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework';
+const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';
 let project,sets;
 const effectPath='Assets/GameplayCameraSystem/EffectAssets/ViewpointVelocity/MovementSpeed.effect';
 before(async()=>{
   sets=await import('../src/effectSets.mjs');
   const temp=await fs.mkdtemp(path.join(os.tmpdir(),'camera-effect-editor-'));
-  for(const name of ['CameraFramework','Foundation','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),name),path.join(temp,name),{recursive:true});
+  for(const name of ['CameraFramework','Foundation','DatabaseSystem','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),name),path.join(temp,name),{recursive:true});
   for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor/Player',name+'.lua'),path.join(temp,'Actor/Player',name+'.lua'));
   project=await Project.open(temp,path.join(temp,'data'),path.resolve('runtime/lua54.exe'));
 });
@@ -36,12 +36,12 @@ for _,c in ipairs(J.Decode(io.read('*a'))) do local ok,s=pcall(c.output and S.Ou
   }
 });
 test('new output templates handle singleton domains and projects without curves',()=>{
-  const curves=[{type:'Curve',path:'Assets/Shared/CurveAssets/Bezier/Linear.curve'}];
+  const curves=[{type:'Curve',documentId:'Shared/CurveAssets/Bezier/Linear.curve',path:'Assets/Shared/CurveAssets/Bezier/Linear.curve'}];
   assert.deepEqual(sets.effectOutputTemplate('{1}',curves),{Type:'Scalar',Range:'{0}'});
   assert.deepEqual(sets.effectOutputTemplate('[0,1]',[]),{Type:'Scalar',Range:'{0}'});
-  assert.deepEqual(sets.effectOutputTemplate('[0,1]',curves),{Type:'Scalar',Range:'[0,1]',Curve:curves[0].path.slice(7)});
+  assert.deepEqual(sets.effectOutputTemplate('[0,1]',curves),{Type:'Scalar',Range:'[0,1]',Curve:{$ref:{DocumentId:curves[0].documentId,Pointer:''}}});
 });
-test('version ten effects save constant outputs and copy as valid typed assets',async()=>{
+test('version one effects save constant outputs and copy as valid typed assets',async()=>{
   const original=await project.read(effectPath),data=JSON.parse(original.text);
   assert.equal(data.SchemaVersion,1);assert.equal(data.Weight,undefined);
   data.Domain='{0} or {1}';data.Outputs={FOV:{Type:'Scalar',Range:'{5}'},'AnchorOffsetX':{Type:'Scalar',Range:'{-2}'}};
