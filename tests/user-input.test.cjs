@@ -3,7 +3,7 @@ const {Project,encode}=require('../electron/project.cjs'),{InputCatalog}=require
 let project,dir,definitions,original;
 const file='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Run/InputAssets/Run_User.userInput',runtime=path.resolve('runtime/lua54.exe');
 before(async()=>{
- dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-user-input-'));const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';
+ dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-user-input-'));const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework';
  for(const name of ['CameraFramework','Foundation','DatabaseSystem','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),name),path.join(dir,name),{recursive:true});
  for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor/Player',name+'.lua'),path.join(dir,'Actor/Player',name+'.lua'));
  definitions=path.join(dir,'InputSystem/MyIMC/Definition/Definitions');original=JSON.parse(await fs.readFile(path.join(definitions,'ActionCamera.json'),'utf8'));
@@ -33,7 +33,7 @@ test('zero/negative multipliers and disabled unavailable mappings persist throug
  await project.save({...await project.read(file),text:doc.text});
 });
 test('input definition changes during save are detected before writing assets',async()=>{
- const doc=await project.read(file),definition=path.join(definitions,'ActionCamera.json'),originalText=await fs.readFile(definition,'utf8'),validate=project.validate;
- project.validate=async function(overrides){const result=await validate.call(this,overrides);await fs.writeFile(definition,originalText+'\n');return result;};
- try{await assert.rejects(()=>project.save({...doc,text:doc.text+'\n'}),/校验期间/);assert.equal((await project.read(file)).text,doc.text);}finally{project.validate=validate;await fs.writeFile(definition,originalText);}
+ const doc=await project.read(file),definition=path.join(definitions,'ActionCamera.json'),originalText=await fs.readFile(definition,'utf8'),validate=project.checkCandidate;
+ project.checkCandidate=async function(overrides){const result=await validate.call(this,overrides);await fs.writeFile(definition,originalText+'\n');return result;};
+ try{await assert.rejects(()=>project.save({...doc,text:doc.text+'\n'}),/校验期间/);assert.equal((await project.read(file)).text,doc.text);}finally{project.checkCandidate=validate;await fs.writeFile(definition,originalText);}
 });

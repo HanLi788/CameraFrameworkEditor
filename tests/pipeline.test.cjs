@@ -3,7 +3,7 @@ const {Project,encode}=require('../electron/project.cjs');
 let project;
 const file='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Run/PipelineAssets/Run_Default.pipeline';
 before(async()=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-pipeline-v3-')),source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-pipeline-v3-')),source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework';
  for(const name of ['CameraFramework','Foundation','DatabaseSystem','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),name),path.join(dir,name),{recursive:true});
  for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor/Player',name+'.lua'),path.join(dir,'Actor/Player',name+'.lua'));
  project=await Project.open(dir,path.join(dir,'data'),path.resolve('runtime/lua54.exe'));

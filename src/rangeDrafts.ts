@@ -1,4 +1,4 @@
-// Flush interval edits before saving or switching to source, including keyboard Save.
+// Flush numeric groups before saving or navigating, including keyboard Save.
 export async function flushRangeEdits(path?:string){
   const jobs:Promise<unknown>[]=[];
   document.querySelectorAll<HTMLElement>('[data-range-interval]').forEach(el=>{

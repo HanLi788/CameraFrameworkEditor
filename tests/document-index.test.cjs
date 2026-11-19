@@ -6,7 +6,7 @@ before(async()=>{project=await fixture();});
 const mutate=async request=>project.mutate({...request,snapshotRevision:(await project.snapshot()).snapshotRevision});
 test('indexed identities resolve to physical paths in both backend and browser graphs',async()=>{
  const snapshot=await project.snapshot(),dash=snapshot.assets.find(a=>a.path.endsWith('/Dash/Dash.rig'));
- assert.deepEqual(snapshot.issues,[]);assert.equal(snapshot.documentIndex.Documents.length,snapshot.assets.length);assert.equal(dash.documentId,'Camera/ActionCamera/Dash/Dash.rig');assert.equal(dash.refs.length,8);
+ assert.deepEqual(snapshot.issues,[]);assert.equal(snapshot.documentIndex.Documents.length,snapshot.assets.length);assert.equal(dash.documentId,'Camera/ActionCamera/Dash/Dash.rig');assert.equal(dash.refs.length,9);assert.ok(dash.refs.some(ref=>ref.field==='Processors.Input.Blend'&&ref.type==='InputBlend'));
  const {collectAssetReferences,assetReference}=await import('../src/assetPaths.mjs');
  assert.deepEqual(collectAssetReferences(dash.data,[],[],snapshot.assets).map(r=>[r.path,r.field]),dash.refs.map(r=>[r.path,r.field]));
  assert.deepEqual(assetReference(dash.refs[0].path,snapshot.assets),dash.data.Ranges[0]);
@@ -35,7 +35,7 @@ test('failed source moves restore both index and source content',async()=>{
  assert.equal((await project.read(indexPath)).text,index.text);assert.equal((await project.read(source)).text,old.text);await assert.rejects(()=>project.read(destination),/ENOENT/);
 });
 test('external index changes during validation block saves and stale file operations',async()=>{
- const file='Assets/Shared/CurveAssets/Bezier/Linear.curve',doc=await project.read(file),index=await project.read(indexPath),snapshot=await project.snapshot(),validate=project.validate.bind(project);
- project.validate=async(...args)=>{const result=await validate(...args);await fs.writeFile(path.join(project.root,indexPath),index.text+'\n');return result;};
- try{await assert.rejects(()=>project.save({...doc,text:doc.text+'\n'}),/校验期间/);assert.equal((await project.read(file)).text,doc.text);await assert.rejects(()=>project.mutate({kind:'copy',sourcePath:file,path:'Assets/Shared/Stale.curve',snapshotRevision:snapshot.snapshotRevision}),/变化/);}finally{project.validate=validate;await fs.writeFile(path.join(project.root,indexPath),index.text);}
+ const file='Assets/Shared/CurveAssets/Bezier/Linear.curve',doc=await project.read(file),index=await project.read(indexPath),snapshot=await project.snapshot(),validate=project.checkCandidate.bind(project);
+ project.checkCandidate=async(...args)=>{const result=await validate(...args);await fs.writeFile(path.join(project.root,indexPath),index.text+'\n');return result;};
+ try{await assert.rejects(()=>project.save({...doc,text:doc.text+'\n'}),/校验期间/);assert.equal((await project.read(file)).text,doc.text);await assert.rejects(()=>project.mutate({kind:'copy',sourcePath:file,path:'Assets/Shared/Stale.curve',snapshotRevision:snapshot.snapshotRevision}),/变化/);}finally{project.checkCandidate=validate;await fs.writeFile(path.join(project.root,indexPath),index.text);}
 });

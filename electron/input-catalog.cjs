@@ -2,11 +2,12 @@ const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('n
 const directory='InputSystem/MyIMC/Definition/Definitions';
 const literal=text=>{let delimiter='====';while(text.includes(']'+delimiter+']'))delimiter+='=';return '['+delimiter+'['+text+']'+delimiter+']';};
 async function collect(workspace){
- const modules={},files={};
- async function walk(dir,prefix){for(const entry of (await fs.readdir(dir,{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name))){if(entry.isSymbolicLink())continue;if(entry.isDirectory()){if(entry.name!=='Test')await walk(path.join(dir,entry.name),prefix+'.'+entry.name);}else if(entry.name.endsWith('.lua'))modules[prefix+'.'+entry.name.slice(0,-4)]=await fs.readFile(path.join(dir,entry.name),'utf8');}}
+ const modules={},files={},stamps=new Map();
+ const read=async file=>{const text=await fs.readFile(file,'utf8'),stat=await fs.stat(file,{bigint:true});stamps.set(file,[stat.size,stat.mtimeNs,stat.ctimeNs,stat.ino].join(':'));return text;};
+ async function walk(dir,prefix){if(prefix!=='CameraFramework.Assets'&&!prefix.startsWith('CameraFramework.Assets.')){const stat=await fs.stat(dir,{bigint:true});stamps.set(dir,[stat.size,stat.mtimeNs,stat.ctimeNs,stat.ino].join(':'));}for(const entry of (await fs.readdir(dir,{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name))){if(entry.isSymbolicLink())continue;if(entry.isDirectory()){if(entry.name!=='Test')await walk(path.join(dir,entry.name),prefix+'.'+entry.name);}else if(entry.name.endsWith('.lua'))modules[prefix+'.'+entry.name.slice(0,-4)]=await read(path.join(dir,entry.name));}}
  await walk(path.join(workspace,'Foundation'),'Foundation');await walk(path.join(workspace,'InputSystem'),'InputSystem');
- for(const entry of (await fs.readdir(path.join(workspace,directory),{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name)))if(entry.isFile()&&entry.name.endsWith('.json'))files[entry.name]=await fs.readFile(path.join(workspace,directory,entry.name),'utf8');
- return {modules,files};
+ for(const entry of (await fs.readdir(path.join(workspace,directory),{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name)))if(entry.isFile()&&entry.name.endsWith('.json'))files[entry.name]=await read(path.join(workspace,directory,entry.name));
+ const result={modules,files};Object.defineProperty(result,'stamps',{value:stamps});return result;
 }
 function run(runtime,script){return new Promise(resolve=>{
  const child=spawn(runtime||'lua54',['-'],{windowsHide:true,stdio:['pipe','pipe','pipe']});let output='',errors='',done=false;
@@ -21,6 +22,7 @@ class InputCatalog {
  async read(workspace,runtime){
   let bundle;
   try{bundle=await collect(workspace);}catch(e){return {revision:'unavailable:'+e.message,contexts:[],runtime:false,issues:[{path:directory,severity:'error',message:e.message}]};}
+  this.bundle=bundle;
   const payload=JSON.stringify(bundle),revision=crypto.createHash('sha256').update(payload).digest('hex');
   if(this.revision!==revision){
    this.revision=revision;

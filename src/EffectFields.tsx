@@ -1,3 +1,4 @@
+import MetadataInput from './MetadataInput';
 import {assetReference,referenceType} from './assetPaths.mjs';
 import HelpTip from './HelpTip';
 import {useEffect,useId,useState} from 'react';
@@ -16,7 +17,7 @@ export function EffectSetField({value,onChange,path,domain,readOnly=false,displa
   } catch(e) {error=(e as Error).message;}
   const hint=output?'值域是增量贡献范围，例如 [-20,0] 或 {5}；单点值域可省略曲线。':'支持区间、单点和并集，例如 [0,300] or [600,999) or {500}。域外当帧不贡献，所有片段共享上下界归一化；false / true 按 0 / 1 处理。';
   return <div className="effect-set-field">
-    <div className="field"><div className="field-label"><label htmlFor={id}>{t(output?'增量值域':'定义域')}</label><HelpTip label={t(output?'增量值域':'定义域')+' '+t('说明')}>{t(hint)}</HelpTip></div><div className="field-control"><input id={id} aria-label={path} aria-invalid={!!error} aria-describedby={error?id+'-error':undefined} type="text" spellCheck={false} readOnly={readOnly} value={displayValue??(typeof draft==='string'?draft:'')} placeholder={output?'[0,20]':'[0,300] or [600,999) or {500}'} onChange={e=>{setDraft(e.target.value);onChange(e.target.value);}}/></div></div>
+    <div className="field"><div className="field-label"><label htmlFor={id}>{t(output?'增量值域':'定义域')}</label><HelpTip label={t(output?'增量值域':'定义域')+' '+t('说明')}>{t(hint)}</HelpTip></div><div className="field-control">{readOnly?<span>{displayValue??value}</span>:<MetadataInput name={path} value={value} validate={(text:string)=>{try{const set=parseEffectSet(text,output);return output&&constantEffectSet(domain)&&set.min!==set.max?'\u5355\u70b9\u5b9a\u4e49\u57df\u5fc5\u987b\u5bf9\u5e94\u5355\u70b9\u503c\u57df':'';}catch(error){return (error as Error).message;}}} onChange={onChange}/>}</div></div>
     {error&&<p id={id+'-error'} className="field-hint effect-set-error" role="alert">{t(error)}</p>}
   </div>;
 }
@@ -27,8 +28,8 @@ export function EffectOutput({value,onChange,onRange,domain,path,assets,onNaviga
   const curves=assets.filter((a:any)=>a.type==='Curve');
   const addCurve=()=>{const curve=curves.find((a:any)=>a.path==='Assets/Shared/CurveAssets/Bezier/Linear.curve')||curves[0];if(curve)onChange({...value,Curve:assetReference(curve.path,assets)});};
   return <div className="effect-output">
-    {unexpected.length>0&&<p className="effect-set-error" role="alert">{t('存在旧版或未知字段，请在源码中修复：')}{unexpected.join(', ')}</p>}
+    {unexpected.length>0&&<p className="effect-set-error" role="alert">{t('存在旧版或未知字段：')}{unexpected.join(', ')}</p>}
     {!hideRange&&<EffectSetField value={value.Range} domain={domain} path={path+'.Range'} onChange={onRange}/>}
-    {!!referenceType(value.Curve)?<><AssetSlot compact={hideRange} hoverPreview={hideRange} value={value.Curve} type="Curve" assets={assets} label={path+'.Curve'} onNavigate={onNavigate} onChange={(Curve:string)=>onChange({...value,Curve})}/>{constant&&<button className="effect-remove-curve" onClick={()=>{const next={...value};delete next.Curve;onChange(next);}}>{t('移除常量映射曲线')}</button>}</>:<div className="effect-curve-empty">{(!constant||value.Curve!==undefined)&&<span role="alert">{t(value.Curve!==undefined?'曲线必须引用已登记文档，请选择曲线或在源码中修复。':'非单点值域必须指定曲线。')}</span>}<button disabled={!curves.length} onClick={addCurve}>{t('添加映射曲线')}</button></div>}
+    {!!referenceType(value.Curve)?<><AssetSlot compact={hideRange} hoverPreview={hideRange} value={value.Curve} type="Curve" assets={assets} label={path+'.Curve'} onNavigate={onNavigate} onChange={(Curve:string)=>onChange({...value,Curve})}/>{constant&&<button className="effect-remove-curve" onClick={()=>{const next={...value};delete next.Curve;onChange(next);}}>{t('移除常量映射曲线')}</button>}</>:<div className="effect-curve-empty">{(!constant||value.Curve!==undefined)&&<span role="alert">{t(value.Curve!==undefined?'曲线必须引用已登记文档，请选择曲线或重新载入。':'非单点值域必须指定曲线。')}</span>}<button disabled={!curves.length} onClick={addCurve}>{t('添加映射曲线')}</button></div>}
   </div>;
 }

@@ -4,8 +4,8 @@ export type Asset={type:string;path:string;documentId?:string;data:any;refs:{pat
 export type InputCatalog={revision:string;contexts:{name:string;mappings:string[];error?:string}[];issues:Issue[];runtime:boolean};
 export type Snapshot={effectCatalog:any;inputCatalog:InputCatalog;root:string;workspaceRoot:string;snapshotRevision:string;directories:string[];files:{path:string;name:string;dir:string;extension:string}[];assets:Asset[];issues:Issue[]};
 export type Document={path:string;text:string;saved:string;revision:string;version:number;conflict:boolean;dirty:boolean;canUndo:boolean;canRedo:boolean};
-declare global {interface Window{cameraEditor:any;MonacoEnvironment:any}}
-export const typeNames:Record<string,string>=Object.fromEntries(['Value','Rig','Input','TransitionInput','Range','Sensitivity','Smooth','Effect','PostProcessing','Camera','Share','VirtualInput','NumEffect','BoolEffect','Filter','Occlusion','Curve','Pipeline'].map(k=>[k,k]));
+declare global {interface Window{cameraEditor:any}}
+export const typeNames:Record<string,string>=Object.fromEntries(['Value','Rig','Input','TransitionInput','InputBlend','Range','Sensitivity','Smooth','Effect','PostProcessing','Camera','Share','VirtualInput','NumEffect','BoolEffect','Filter','Occlusion','Curve','Pipeline'].map(k=>[k,k==='InputBlend'?'\u8f93\u5165\u6df7\u5408\u8d44\u4ea7':k]));
 export const parse=(text:string)=>{try{return JSON.parse(text.replace(/^\uFEFF/,''));}catch{return null;}};
 export const format=(data:any)=>JSON.stringify(data,null,2)+'\n';
 export const filename=(p:string)=>p.split('/').at(-1)||p;

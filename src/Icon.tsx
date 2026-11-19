@@ -1,5 +1,6 @@
 import type {ButtonHTMLAttributes} from 'react';
 const shapes:Record<string,string>={
+  edit:'M15 4l5 5 M4 20l5-1L21 7a2 2 0 0 0-5-5L4 15Z',
   'scene-npc':'M8 2h8v7H8Z M5 11h14v8h-4v3h-3v-7h-1v7H8v-3H5Z',
   'post-focus':'M3 8V3h5 M16 3h5v5 M21 16v5h-5 M8 21H3v-5 M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
   'post-sun':'M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2',
@@ -78,6 +79,6 @@ const shapes:Record<string,string>={
   image:'M3 3h18v18H3Z M3 17l6-6 4 4 3-3 5 5 M16 7h.01',
   search:'M16 10a6 6 0 1 1-12 0 6 6 0 0 1 12 0 M15 15l6 6'
 };
-export const assetIcons:Record<string,string>={TransitionInput:'input',Camera:'camera',Share:'link',VirtualInput:'input',NumEffect:'effect',BoolEffect:'effect',Filter:'outputs',Value:'value',Rig:'camera',Input:'input',Range:'range',Sensitivity:'sliders',Smooth:'smooth',Effect:'effect',PostProcessing:'outputs',Occlusion:'occlusion',Curve:'curve',Pipeline:'pipeline'};
+export const assetIcons:Record<string,string>={TransitionInput:'input',InputBlend:'sliders',Camera:'camera',Share:'link',VirtualInput:'input',NumEffect:'effect',BoolEffect:'effect',Filter:'outputs',Value:'value',Rig:'camera',Input:'input',Range:'range',Sensitivity:'sliders',Smooth:'smooth',Effect:'effect',PostProcessing:'outputs',Occlusion:'occlusion',Curve:'curve',Pipeline:'pipeline'};
 export default function Icon({name,size=16,className=''}:{name:string;size?:number;className?:string}){return <svg className={'ui-icon icon-'+name+' '+className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false"><path d={shapes[name]||shapes.file}/></svg>;}
 export function IconButton({icon,label,children,...props}:ButtonHTMLAttributes<HTMLButtonElement>&{icon:string;label:string}){return <button {...props} aria-label={props['aria-label']||label} title={props.title||label}><Icon name={icon}/>{children}</button>;}

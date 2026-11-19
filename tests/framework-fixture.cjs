@@ -1,6 +1,6 @@
 const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {Project}=require('../electron/project.cjs');
-const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';
+const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework';
 async function fixture(){
  const temp=await fs.mkdtemp(path.join(os.tmpdir(),'camera-editor-current-'));
  for(const directory of ['CameraFramework','Foundation','DatabaseSystem','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),directory),path.join(temp,directory),{recursive:true});

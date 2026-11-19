@@ -1,7 +1,7 @@
 {
   "name": "camera-framework-editor",
   "productName": "相机框架编辑器",
-  "version": "0.7.2",
+  "version": "0.9.3",
   "private": true,
   "description": "Independent desktop editor for Lua CameraFramework assets",
   "main": "electron/main.cjs",
@@ -16,18 +16,14 @@
     "package:installer": "npm run electron:install && electron-builder --win nsis --x64 --publish never"
   },
   "devDependencies": {
-    "@monaco-editor/react": "4.7.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "5.2.0",
     "electron": "45.2.3",
     "electron-builder": "26.18.0",
-    "monaco-editor": "0.55.1",
     "playwright": "1.64.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1",
     "typescript": "5.9.3",
     "vite": "7.3.7"
   },

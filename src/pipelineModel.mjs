@@ -1,22 +1,21 @@
 import {assetFile} from './assetPaths.mjs';
 export const baseStages=['Input','Effects','Render','Occlusion','Smooth'];
 export const stageLabels={Input:'输入',Effects:'效果',Render:'渲染目标',Occlusion:'遮挡',Smooth:'平滑',Subject:'主体',Evaluation:'评估'};
-export const implementations=space=>space==='Roam'?['Common.Input','Common.Smooth']:[...baseStages.map(name=>'Common.'+name),...(space==='Battle'?['Battle.Subject','Battle.Evaluation']:[])];
+export const implementations=space=>[...baseStages.map(name=>'Common.'+name),...(space==='Battle'?['Battle.Subject','Battle.Evaluation']:[])];
 const requires={'Common.Occlusion':['Render'],'Battle.Evaluation':['Subject']};
 export function pipelineProblems(data){
   const errors=[];
   if(data.SchemaVersion!==1)errors.push(['管线资产版本必须为 1','']);
-  if(!data.Stages||typeof data.Stages!=='object'||Array.isArray(data.Stages)||!Array.isArray(data.Flow)||!Array.isArray(data.Disabled))return [['管线结构无效，请在源码中修复','']];
+  if(!data.Stages||typeof data.Stages!=='object'||Array.isArray(data.Stages)||!Array.isArray(data.Flow)||!Array.isArray(data.Disabled))return [['管线结构无效，请修复资产后重新载入','']];
   const all=[...data.Flow,...data.Disabled],allowed=implementations(data.SpaceType);
   if(!['Action','Battle','Idle','Interactive','Preview','Roam'].includes(data.SpaceType))errors.push(['未知相机空间类型：',String(data.SpaceType)]);
-  if(data.SpaceType==='Roam'&&(JSON.stringify(data.Flow)!==JSON.stringify(['Input','Smooth'])||data.Disabled.length||Object.keys(data.Stages).some(name=>!['Input','Smooth'].includes(name))))errors.push(['序列管线必须为 Input → Smooth，且不可禁用阶段','']);
   if(!data.Flow.length)errors.push(['管线至少需要一个启用阶段','']);
-  for(const name of new Set([...(data.SpaceType==='Roam'?['Input','Smooth']:baseStages),...Object.keys(data.Stages),...all])){
+  for(const name of new Set([...baseStages,...Object.keys(data.Stages),...all])){
     if(!data.Stages[name]||all.filter(n=>n===name).length!==1){errors.push(['阶段必须声明且只归属一个列表：',String(name)]);continue;}
     const stage=data.Stages[name];
     if(!allowed.includes(stage.Implementation))errors.push(['当前空间未注册此实现：',String(stage.Implementation)]);
-    if(typeof stage!=='object'||Array.isArray(stage))errors.push(['管线结构无效，请在源码中修复',String(name)]);
-    else for(const key of Object.keys(stage))if(key!=='Implementation')errors.push([key==='Options'?'管线阶段已移除 Options，请在源码中修复：':'阶段存在未知字段：',`${name}.${key}`]);
+    if(typeof stage!=='object'||Array.isArray(stage))errors.push(['管线结构无效，请修复资产后重新载入',String(name)]);
+    else for(const key of Object.keys(stage))if(key!=='Implementation')errors.push([key==='Options'?'管线阶段已移除 Options，请修复资产后重新载入：':'阶段存在未知字段：',`${name}.${key}`]);
     const index=data.Flow.indexOf(name);
     if(index>=0)for(const dependency of requires[stage.Implementation]||[])if(data.Flow.indexOf(dependency)<0||data.Flow.indexOf(dependency)>=index)errors.push(['阶段缺少前置依赖：',`${name} → ${dependency}`]);
   }
@@ -30,7 +29,6 @@ export function toggleStage(data,name,enabled){
 }
 export function changePipelineSpace(data,space){
  if(space===data.SpaceType)return data;
- if(space==='Roam')return {...data,SpaceType:space,Stages:{Input:{Implementation:'Common.Input'},Smooth:{Implementation:'Common.Smooth'}},Flow:['Input','Smooth'],Disabled:[]};
  const allowed=implementations(space),Stages=Object.fromEntries(Object.entries(data.Stages||{}).filter(([,stage])=>allowed.includes(stage.Implementation)));
  for(const name of baseStages)Stages[name]??={Implementation:'Common.'+name};
  const Disabled=(data.Disabled||[]).filter(name=>Object.hasOwn(Stages,name)),Flow=(data.Flow||[]).filter(name=>Object.hasOwn(Stages,name));

@@ -14,14 +14,14 @@ test('target choices reject default values and duplicate pairs while allowing co
  assert.equal(targetChoiceAllowed(same,mounts,assets),false);assert.equal(targetChoiceAllowed(same,mounts,assets,0),true);assert.equal(targetChoiceAllowed(variant,mounts,assets),true);assert.equal(targetChoiceAllowed(base,mounts,assets),true);assert.equal(targetChoiceAllowed({type:'Value',data:{}},[],assets),false);
  assert.notEqual(performanceKey(a.data.PerformanceType),performanceKey(variant.data.PerformanceType));assert.ok(performanceProblem({BaseName:'PERFORMANCE_NPC',CodeName:1}));
 });
-test('usage tracking distinguishes Enter, Change, Exit, defaults and specialized targets',async()=>{
- const {transitionInputUsers,transitionValueUsers,transitionRole}=await import('../src/transitionTargets.mjs');
- const enter=asset('Camera/A.transitionInput','TransitionInput'),change=asset('Camera/C.transitionInput','TransitionInput'),exit=asset('Camera/B.transitionInput','TransitionInput',{DefaultValueAsset:ref('Camera/Default.transitionValue'),ValueAssets:[ref('Camera/Special.transitionValue')]});
+test('usage tracking distinguishes Enter, Change and Exit without a default target',async()=>{
+ const {transitionInputUsers,transitionRole}=await import('../src/transitionTargets.mjs');
+ const enter=asset('Camera/A.transitionInput','TransitionInput'),change=asset('Camera/C.transitionInput','TransitionInput'),exit=asset('Camera/B.transitionInput','TransitionInput',{Name:'B_Exit',ValueAssets:[ref('Camera/Special.transitionValue')]});
  const defaults=asset('Camera/Default.transitionValue','Value'),target=asset('Camera/Special.transitionValue','Value');
  const rig=asset('Camera/A.rig','Rig',{Processors:{Input:{Enter:ref(enter.documentId),Change:ref(change.documentId),Exit:ref(exit.documentId)}}}),assets=[rig,enter,change,exit,defaults,target];
  assert.deepEqual(transitionInputUsers(assets,enter.path),[{path:rig.path,role:'Enter',sequence:false}]);
  assert.equal(transitionInputUsers(assets,change.path)[0].role,'Change');assert.equal(transitionRole(exit.data),'Exit');
- assert.deepEqual(transitionValueUsers(assets,defaults.path),{defaults:[exit.path],targets:[]});assert.deepEqual(transitionValueUsers(assets,target.path),{defaults:[],targets:[exit.path]});
+ assert.equal(transitionInputUsers(assets,exit.path)[0].role,'Exit');
 });
 test('sequence choices match unique positive SequenceId values and exclude Actor targets',async()=>{
  const {targetChoiceAllowed}=await import('../src/transitionTargets.mjs');

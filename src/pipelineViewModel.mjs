@@ -1,4 +1,7 @@
 import {assetFile,collectAssetReferences} from './assetPaths.mjs';
+import {stageLabels} from './pipelineModel.mjs';
+export const commonRigSections=[{key:'Ranges',label:'范围资产',icon:'range'},{key:'Pipelines',label:'管线资产',icon:'pipeline'}];
+export const rigSectionLabel=section=>commonRigSections.find(item=>item.key===section)?.label||stageLabels[section]||section;
 const spaceOrder=['Action','Battle','Idle','Interactive','Preview','Roam'];
 export function rigChoicesBySpace(assets){
  const index=new Map(assets.map(a=>[a.path,a])),groups=new Map();
@@ -23,5 +26,6 @@ export function processorPipeline(assets,rigPath){
  return {rig,pipeline,pipelinePath,flow:names(pipeline?.data?.Flow).map(n=>make(n,true)),disabled:names(pipeline?.data?.Disabled).map(n=>make(n,false))};
 }
 export function processorReferences(rig,stage,assets=[]){
- return collectAssetReferences({value:rig?.data?.Processors?.[stage]},[],[],assets).map(r=>r.path);
+ const value=commonRigSections.some(item=>item.key===stage)?rig?.data?.[stage]:rig?.data?.Processors?.[stage];
+ return collectAssetReferences({value},[],[],assets).map(r=>r.path);
 }

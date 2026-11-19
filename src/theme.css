@@ -1,0 +1,53 @@
+/* One palette for the complete application, including body-level portals. */
+:root{
+ --canvas:#242628;
+ --surface:#2b2e31;
+ --surface-raised:#32363a;
+ --surface-header:#383d42;
+ --surface-inset:#222528;
+ --surface-hover:#3c4248;
+ --control-top:#33373b;
+ --control-bottom:#272a2e;
+ --control-edge:#5b6168;
+ --line:#484d53;
+ --line-dark:#1b1e21;
+ --control-line:var(--control-edge);
+ --table-line:var(--line);
+ --table-body:var(--surface);
+ --text:#d7dadd;
+ --text-muted:#a0a5ab;
+ --text-dim:#7b828a;
+ --accent:#8bb2cc;
+ --accent-muted:#7896ad;
+ --selection:#364b5b;
+ --selection-text:#e2edf5;
+ --danger:#df9994;
+ --danger-surface:#493032;
+ --warning:#d8bd8f;
+ --warning-surface:#443b2d;
+ --asset-curve:#b8abcd;
+ --asset-input:#cebd99;
+ --asset-range:#a7b5c6;
+ --asset-effect:#b9abc8;
+ --control-face:linear-gradient(180deg,var(--control-top),var(--control-bottom));
+ --header-face:linear-gradient(180deg,var(--surface-header),var(--surface));
+ --raised-edge:inset 0 1px #ffffff10,inset 0 -1px #00000038;
+ --inset-edge:inset 0 1px 2px #00000038;
+ --panel-shadow:0 8px 24px #00000055;
+ --muted:var(--text-muted);
+ --panel:var(--surface);
+ --hover:var(--surface-hover);
+ color-scheme:dark;
+}
+
+/* Style the browser's accessible select picker instead of the OS white popup. */
+select,select::picker(select){appearance:base-select}
+select{align-items:center;gap:4px}
+select::picker(select){background:var(--surface);color:var(--text);border:1px solid var(--control-edge);border-radius:2px;padding:2px;max-height:320px;box-shadow:var(--panel-shadow);scrollbar-color:var(--control-edge) var(--surface-inset)}
+select::picker-icon{color:var(--text-muted);font-size:9px;margin-inline-start:auto;flex:none}
+select:open{border-color:var(--accent)}
+select option,select optgroup{background:var(--surface);color:var(--text);font:inherit}
+select option{min-height:24px;padding:4px 8px;border:0;white-space:nowrap}
+select option::checkmark{display:none}
+select option:checked,select option:hover,select option:focus-visible{background:var(--selection);color:var(--selection-text)}
+select option:disabled{color:var(--text-dim);opacity:.6}

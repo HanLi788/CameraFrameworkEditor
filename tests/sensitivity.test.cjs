@@ -4,14 +4,14 @@ const {Project,encode}=require('../electron/project.cjs');
 let project;
 const input='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Run/InputAssets/Run_User.userInput',sensitivity='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Run/SensitivityAssets/Run_Default.sensitivity',rig='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Run/Run.rig',unit='Assets/Shared/CurveAssets/CubicHermiteSpline/RangeUnit.curve';
 before(async()=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-sensitivity-')),source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'camera-sensitivity-')),source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework';
  for(const name of ['CameraFramework','Foundation','DatabaseSystem','InputSystem','EventBus'])await fs.cp(path.join(path.dirname(source),name),path.join(dir,name),{recursive:true});
  for(const name of ['PlayerEvents','MovementValues'])await fs.cp(path.join(path.dirname(source),'Actor/Player',name+'.lua'),path.join(dir,'Actor/Player',name+'.lua'));
  project=await Project.open(dir,path.join(dir,'data'),path.resolve('runtime/lua54.exe'));
 });
-test('direction sensitivity owns fifteen channels; input owns mounts; graph and shared owners follow both references',async()=>{
+test('direction sensitivity owns thirteen channels; input owns mounts; graph and shared owners follow both references',async()=>{
  const snap=await project.snapshot(),a=snap.assets.find(a=>a.path===sensitivity),i=snap.assets.find(a=>a.path===input),r=snap.assets.find(a=>a.path===rig);
- assert.equal(a.data.SchemaVersion,1);assert.equal(Object.keys(a.data.Channels).length,15);assert.equal(a.refs.length,30);assert.ok(a.refs.every(r=>r.path===unit&&r.type==='Curve'));
+ assert.equal(a.data.SchemaVersion,1);assert.equal(Object.keys(a.data.Channels).length,13);assert.equal(a.refs.length,26);assert.ok(a.refs.every(r=>r.path===unit&&r.type==='Curve'));
  assert.equal(i.data.SchemaVersion,1);assert.deepEqual(i.data.SensitivityAssets,[await referenceFor(project,sensitivity)]);assert.ok(i.refs.some(r=>r.path===sensitivity&&r.field==='SensitivityAssets.0'));
  assert.equal(r.data.SchemaVersion,1);assert.equal(r.data.Processors.Input.SensitivityAssets,undefined);
  const {rigOwners}=await import('../src/rigGraph.mjs');assert.ok(rigOwners(snap.assets).get(sensitivity.toLowerCase()).includes(rig));
@@ -25,7 +25,7 @@ test('legacy sensitivity fields, legacy input weights and zero return curves can
  }
 });
 test('new channels save and sensitivity/curve moves preserve input and both direction identities',async()=>{
- const doc=await project.read(sensitivity),data=JSON.parse(doc.text);data.Channels.FOV.bEnabled=true;data.Channels['AnchorOffsetX'].bEnabled=true;
+ const doc=await project.read(sensitivity),data=JSON.parse(doc.text);data.Channels.FOV.bEnabled=true;data.Channels['AnchorLocOffset'].bEnabled=true;
  await project.save({...doc,text:encode(data)});
  const curve='Assets/GameplayCameraSystem/Custom/Direction.curve';await project.mutate({kind:'copy',sourcePath:unit,path:curve,snapshotRevision:(await project.snapshot()).snapshotRevision});
  data.Channels.FOV.EscapeCurve=await referenceFor(project,curve);data.Channels.FOV.ReturnCurve=await referenceFor(project,curve);await project.save({...await project.read(sensitivity),text:encode(data)});

@@ -1,5 +1,5 @@
 // Files are addressed relative to CameraFramework; JSON references are relative to Assets.
-const extensions={Rig:'.rig',Pipeline:'.pipeline',Input:'.userInput',TransitionInput:'.transitionInput',Value:'.transitionValue',Effect:'.effect',PostProcessing:'.postProcessing',Camera:'.camera',Share:'.share',VirtualInput:'.virtualInput',NumEffect:'.numEffect',BoolEffect:'.boolEffect',Filter:'.filter',Range:'.range',Sensitivity:'.sensitivity',Occlusion:'.occlusion',Smooth:'.smooth',Curve:'.curve'};
+const extensions={Rig:'.rig',Pipeline:'.pipeline',Input:'.userInput',TransitionInput:'.transitionInput',InputBlend:'.inputBlend',Value:'.transitionValue',Effect:'.effect',PostProcessing:'.postProcessing',Camera:'.camera',Share:'.share',VirtualInput:'.virtualInput',NumEffect:'.numEffect',BoolEffect:'.boolEffect',Filter:'.filter',Range:'.range',Sensitivity:'.sensitivity',Occlusion:'.occlusion',Smooth:'.smooth',Curve:'.curve'};
 const typeOf=p=>Object.keys(extensions).find(k=>p.endsWith(extensions[k]));
 const indexPath='Assets/Documents.index.json';
 const assetKey=p=>typeof p==='string'&&p.startsWith('Assets/')?p.slice(7):p;

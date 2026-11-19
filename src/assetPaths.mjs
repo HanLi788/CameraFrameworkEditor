@@ -10,7 +10,7 @@ export function assetReference(file,assets){
  if(!asset?.documentId)throw Error('资产未登记到文档索引：'+file);
  return {$ref:{DocumentId:asset.documentId,Pointer:''}};
 }
-const suffixes={rig:'Rig',pipeline:'Pipeline',userInput:'Input',transitionInput:'TransitionInput',transitionValue:'Value',curve:'Curve',effect:'Effect',range:'Range',smooth:'Smooth',sensitivity:'Sensitivity',occlusion:'Occlusion',camera:'Camera',share:'Share',postProcessing:'PostProcessing',virtualInput:'VirtualInput',numEffect:'NumEffect',boolEffect:'BoolEffect',filter:'Filter'};
+const suffixes={rig:'Rig',pipeline:'Pipeline',userInput:'Input',transitionInput:'TransitionInput',inputBlend:'InputBlend',transitionValue:'Value',curve:'Curve',effect:'Effect',range:'Range',smooth:'Smooth',sensitivity:'Sensitivity',occlusion:'Occlusion',camera:'Camera',share:'Share',postProcessing:'PostProcessing',virtualInput:'VirtualInput',numEffect:'NumEffect',boolEffect:'BoolEffect',filter:'Filter'};
 export const referenceType=value=>typeof documentId(value)==='string'?suffixes[documentId(value).split('.').at(-1)]:undefined;
 export function collectAssetReferences(value,parts=[],refs=[],assets=[]){
  if(!value||typeof value!=='object')return refs;
@@ -22,4 +22,4 @@ export function collectAssetReferences(value,parts=[],refs=[],assets=[]){
  }
  return refs;
 }
-export const assetExtensions={Rig:'.rig',Pipeline:'.pipeline',Input:'.userInput',TransitionInput:'.transitionInput',Value:'.transitionValue',Curve:'.curve',Effect:'.effect',Range:'.range',Smooth:'.smooth',Sensitivity:'.sensitivity',Occlusion:'.occlusion',VirtualInput:'.virtualInput',NumEffect:'.numEffect',BoolEffect:'.boolEffect',Filter:'.filter'};
+export const assetExtensions={Rig:'.rig',Pipeline:'.pipeline',Input:'.userInput',TransitionInput:'.transitionInput',InputBlend:'.inputBlend',Value:'.transitionValue',Curve:'.curve',Effect:'.effect',Range:'.range',Smooth:'.smooth',Sensitivity:'.sensitivity',Occlusion:'.occlusion',VirtualInput:'.virtualInput',NumEffect:'.numEffect',BoolEffect:'.boolEffect',Filter:'.filter'};

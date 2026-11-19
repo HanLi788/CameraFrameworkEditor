@@ -1,6 +1,12 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const ref=require('../electron/asset-protocol.cjs').documentReference;
-const {openTab,removeTab,moveTabs}=require('../electron/workbench.cjs');
+const {openTab,selectTab,removeTab,moveTabs}=require('../electron/workbench.cjs');
+
+test('a new rig opens in its complete common configuration overview',()=>{
+ const meta={tabs:[]};openTab(meta,{path:'Assets/A.rig',rig:true});assert.equal(meta.processor,'');
+ openTab(meta,{path:'Assets/Shared/A.curve'});assert.equal(meta.rig,'Assets/A.rig');assert.equal(meta.processor,'');
+ openTab(meta,{path:'Assets/A.rig',rig:true});assert.equal(meta.processor,'');assert.equal(meta.tabs.length,2);
+});
 test('following mounts keeps rig and processor context and reuses each file tab',()=>{
  const m={tabs:[]};openTab(m,{path:'Assets/A.rig',rig:true});openTab(m,{path:'Assets/A.rig',rig:true,processor:'Smooth'});
  openTab(m,{path:'Assets/Shared/A.smooth'});openTab(m,{path:'Assets/Shared/C.curve'});openTab(m,{path:'Assets/Shared/A.smooth'});
@@ -10,6 +16,29 @@ test('following mounts keeps rig and processor context and reuses each file tab'
 test('each rig remembers its processor including the common settings view',()=>{
  const m={tabs:[]};openTab(m,{path:'A.rig',rig:true,processor:''});openTab(m,{path:'B.rig',rig:true,processor:'Render'});
  openTab(m,{path:'A.rig',rig:true});assert.equal(m.processor,'');openTab(m,{path:'B.rig',rig:true});assert.equal(m.processor,'Render');
+});
+
+test('rig subpages reuse the physical file tab and restore after following assets or closing another rig',()=>{
+ const m={tabs:[]};openTab(m,{path:'A.rig',rig:true,processor:'Ranges'});
+ openTab(m,{path:'A.range'});selectTab(m,'A.rig');
+ assert.equal(m.processor,'Ranges');assert.equal(m.tabs[0].section,'Ranges');
+ openTab(m,{path:'A.rig',rig:true,processor:'Input'});
+ assert.equal(m.tabs.filter(tab=>tab.path==='A.rig').length,1);assert.equal(m.tabs[0].section,'Input');
+ removeTab(m,'A.range');
+ openTab(m,{path:'B.rig',rig:true,processor:'Pipelines'});selectTab(m,'A.rig');
+ assert.equal(m.processor,'Input');selectTab(m,'B.rig');removeTab(m,'B.rig');
+ assert.equal(m.rig,'A.rig');assert.equal(m.processor,'Input');
+ moveTabs(m,{'A.rig':'Renamed.rig'});assert.equal(m.processor,'Input');assert.equal(m.tabs[0].section,'Input');
+ assert.ok(m.tabs.every(tab=>!tab.path.includes('//')));
+});
+
+test('common configuration scopes resolve range and pipeline mounts',async()=>{
+ const {processorReferences,rigSectionLabel}=await import('../src/pipelineViewModel.mjs');
+ const assets=[{documentId:'A.range',path:'Assets/A.range'},{documentId:'A.pipeline',path:'Assets/A.pipeline'}];
+ const rig={data:{Ranges:[ref('A.range')],Pipelines:[ref('A.pipeline')]}};
+ assert.deepEqual(processorReferences(rig,'Ranges',assets),['Assets/A.range']);
+ assert.deepEqual(processorReferences(rig,'Pipelines',assets),['Assets/A.pipeline']);
+ assert.equal(rigSectionLabel('Input'),'输入');assert.equal(rigSectionLabel('Ranges'),'范围资产');
 });
 test('transactional moves and deletes update open tabs and rig context',()=>{
  const m={tabs:[]};openTab(m,{path:'A.rig',rig:true});openTab(m,{path:'C.curve'});

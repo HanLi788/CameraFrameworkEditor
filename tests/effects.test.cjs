@@ -4,7 +4,7 @@ const {spawnSync}=require('node:child_process');
 const {Project,encode}=require('../electron/project.cjs');
 const {Documents}=require('../electron/documents.cjs');
 
-const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/MyWorks/Lua/CameraFramework';
+const source=process.env.CAMERA_FRAMEWORK_TEST_ROOT||'F:/cslua3/ue5cs/cslua/Content/Lua/CameraFramework';
 let project,sets;
 const effectPath='Assets/GameplayCameraSystem/EffectAssets/ViewpointVelocity/MovementSpeed.effect';
 before(async()=>{
@@ -44,7 +44,7 @@ test('new output templates handle singleton domains and projects without curves'
 test('version one effects save constant outputs and copy as valid typed assets',async()=>{
   const original=await project.read(effectPath),data=JSON.parse(original.text);
   assert.equal(data.SchemaVersion,1);assert.equal(data.Weight,undefined);
-  data.Domain='{0} or {1}';data.Outputs={FOV:{Type:'Scalar',Range:'{5}'},'AnchorOffsetX':{Type:'Scalar',Range:'{-2}'}};
+  data.Domain='{0} or {1}';data.Outputs={FOV:{Type:'Scalar',Range:'{5}'},'AnchorLocOffset.X':{Type:'Scalar',Range:'{-2}'}};
   const saved=await project.save({...original,text:encode(data)});
   assert.deepEqual(JSON.parse(saved.text),data);
   const dest='Assets/GameplayCameraSystem/Custom/Constant.effect',snap=await project.snapshot();
@@ -57,7 +57,8 @@ test('real Lua validation rejects old fields, invalid sets and ambiguous mapping
   const original=await project.read(effectPath);
   for(const change of [v=>v.SchemaVersion=6,v=>v.Weight=1,v=>delete v.Domain,v=>v.Domain='[0,1)∪',
     v=>v.Outputs.FOV.DeadZone={Min:0,Max:1},v=>v.Outputs.FOV.Weight=1,v=>v.Outputs.FOV.Range='{0,1}',
-    v=>v.Outputs.FOV.Range='(0,20]',v=>delete v.Outputs.FOV.Curve,v=>v.Domain='{1}']){
+    v=>v.Outputs.FOV.Range='(0,20]',v=>delete v.Outputs.FOV.Curve,v=>v.Domain='{1}',
+    v=>v.Outputs={AnchorLocOffset:{Type:'Vector',Range:['{0}','{0}','{0}']}},v=>v.Outputs={'AnchorLocOffset.X':{Type:'Vector',Range:'{0}'}},v=>v.Outputs={'AnchorLocOffset.W':{Type:'Scalar',Range:'{0}'}}]){
     const data=JSON.parse(original.text);change(data);
     await assert.rejects(()=>project.save({...original,text:encode(data)}));
     assert.equal((await project.read(effectPath)).text,original.text);
@@ -66,16 +67,16 @@ test('real Lua validation rejects old fields, invalid sets and ambiguous mapping
 test('shared domain and dotted output edits preserve undo and save through Documents',async()=>{
   const original=await project.read(effectPath),store=new Documents(project),doc=await store.ensure(effectPath),data=JSON.parse(doc.text);
   store.editField({path:doc.path,parts:['Domain'],baseValue:data.Domain,value:'[0,300] or [600,999) or {500}'});
-  store.editField({path:doc.path,parts:['Outputs'],baseValue:data.Outputs,value:{'AnchorOffsetX':{Type:'Scalar',Range:'{-5}'}}});
-  store.editField({path:doc.path,parts:['Outputs','AnchorOffsetX','Range'],baseValue:'{-5}',value:'{5}'});
-  store.history(doc.path);assert.equal(JSON.parse(doc.text).Outputs['AnchorOffsetX'].Range,'{-5}');
+  store.editField({path:doc.path,parts:['Outputs'],baseValue:data.Outputs,value:{'AnchorLocOffset.X':{Type:'Scalar',Range:'{-5}'}}});
+  store.editField({path:doc.path,parts:['Outputs','AnchorLocOffset.X','Range'],baseValue:'{-5}',value:'{5}'});
+  store.history(doc.path);assert.equal(JSON.parse(doc.text).Outputs['AnchorLocOffset.X'].Range,'{-5}');
   await store.save({paths:[doc.path],versions:{[doc.path]:doc.version}});
   await project.save({...await project.read(effectPath),text:original.text});
 });
 
 test('registry is read from workspace Lua, validates declarations and refreshes source changes',async()=>{
  const file=path.join(project.root,'InterfaceRegistry/GameplayCameraSystem/InterfaceRegistry.lua'),original=await fs.readFile(file,'utf8');
- const before=await project.snapshot();assert.ok(before.effectCatalog.objects.find(o=>o.name==='Viewpoint').interfaces.some(i=>i.name==='IsMoving'));assert.equal(before.effectCatalog.channels.length,15);assert.ok(!before.effectCatalog.channels.includes('ExposureCompensation'));
+ const before=await project.snapshot();assert.ok(before.effectCatalog.objects.find(o=>o.name==='Viewpoint').interfaces.some(i=>i.name==='IsMoving'));assert.equal(before.effectCatalog.channels.length,15);assert.ok(!before.effectCatalog.channels.includes('ExposureCompensation'));assert.deepEqual(before.effectCatalog.outputs.slice(0,3),['X','Y','Z'].map(component=>({name:'AnchorLocOffset.'+component,type:'Scalar',channel:'AnchorLocOffset',component})));
  try{
   await fs.writeFile(file,original.replace('GetSpeedValue = {','CustomNumber = {bMemberFunction=false,ReturnType="number",Params={{Name="Gain",Type="number",Min=0,Max=2,Default=1}}},\n        GetSpeedValue = {'));
   const changed=await project.snapshot();assert.notEqual(changed.snapshotRevision,before.snapshotRevision);assert.ok(changed.effectCatalog.objects.find(o=>o.name==='Viewpoint').interfaces.some(i=>i.name==='CustomNumber'));

@@ -1,0 +1,80 @@
+// Preview-only palette overrides. The editor source and release are not modified.
+const path=require('node:path'),fs=require('node:fs/promises'),assert=require('node:assert/strict');
+const root=path.resolve(__dirname,'../..');
+const {_electron:electron}=require(path.join(root,'node_modules/playwright'));
+const {fixture}=require(path.join(root,'tests/framework-fixture.cjs'));
+const themes=[
+ {id:'01-frost-dark',name:'深色寒霜',scheme:'dark',canvas:'#101a28',surface:'#162333',raised:'#1d2d40',head:'#1c2d41',field:'#111e2e',selection:'#203f54',fg:'#dce9f5',muted:'#92a9bf',line:'#365168',accent:'#83d9f2',selectedText:'#e3f8ff',hover:'#243b50',edge:'#b9e4ff23',shadow:'#050c1766',rig:'#96ddef',input:'#d6c39d',curve:'#bfafe7',range:'#b2c6e4',pipeline:'#8ecddb'},
+ {id:'02-frost-light',name:'浅色冰霜',scheme:'light',canvas:'#e5eef5',surface:'#f3f8fc',raised:'#ffffff',head:'#e6eff7',field:'#fcfeff',selection:'#d7eaf7',fg:'#263d51',muted:'#627d93',line:'#b6cbdc',accent:'#347fa7',selectedText:'#164d70',hover:'#dceaf4',edge:'#ffffffd9',shadow:'#627c9822',rig:'#397f9d',input:'#937043',curve:'#84669d',range:'#677e9c',pipeline:'#347f97'},
+ {id:'03-frost-slate',name:'冷灰寒霜',scheme:'dark',canvas:'#1e2630',surface:'#252f3b',raised:'#2c3947',head:'#2a3644',field:'#202a35',selection:'#344d60',fg:'#dce5ed',muted:'#a0b0c0',line:'#4a5b6c',accent:'#aacfe4',selectedText:'#e4f2fa',hover:'#344352',edge:'#d4ebff1c',shadow:'#10172055',rig:'#afcfdd',input:'#c8b99d',curve:'#bcb0ce',range:'#bbc6d8',pipeline:'#a1c6d1'}
+];
+function css(theme){
+ const vars=Object.entries(theme).filter(([key])=>!['id','name','scheme'].includes(key)).map(([key,value])=>`--f-${key}:${value}`).join(';');
+ return `/* ${theme.name}: temporary, preview-only stylesheet. */
+:root{${vars};color-scheme:${theme.scheme}!important;color:var(--f-fg)!important;background:var(--f-canvas)!important;--accent:var(--f-accent);--muted:var(--f-muted);--line:var(--f-line);--panel:var(--f-surface);--hover:var(--f-hover)}
+.asset-workbench{--accent:var(--f-accent);--muted:var(--f-muted);--line:var(--f-line);--panel:var(--f-surface);--hover:var(--f-hover);--table-line:var(--f-line);--control-line:var(--f-line);background:radial-gradient(ellipse at 55% -30%,var(--f-selection),transparent 65%),var(--f-canvas)!important;color:var(--f-fg)!important}
+button,input,select,textarea{color:inherit}button:hover{background:var(--f-hover)!important}
+.toolbar{background:linear-gradient(180deg,var(--f-raised),var(--f-surface))!important;border-color:var(--f-line)!important;box-shadow:inset 0 1px var(--f-edge)}
+.app-brand{color:var(--f-selectedText)}.app-brand .ui-icon{color:var(--f-accent)}.toolbar-divider{background:var(--f-line)!important}
+.validate-button,.primary{background:var(--f-selection)!important;border-color:var(--f-accent)!important;color:var(--f-selectedText)!important}
+.toolbar button:disabled{opacity:.35}.toolbar kbd{color:var(--f-muted)!important}
+.folder-directory,.directory-panel,.context-host,.rig-sidebar{background:var(--f-surface)!important;border-color:var(--f-line)!important}
+.panel-heading,.context-heading{border-color:var(--f-line)!important;color:var(--f-fg)!important}
+.folder-row,.tree-row{color:var(--f-muted)!important}.folder-name svg,.folder-search-result svg,.folder-icon{color:var(--f-pipeline)!important}
+.folder-row.selected,.tree-row.selected,.tree-root.selected{background:var(--f-selection)!important;color:var(--f-selectedText)!important;border-color:var(--f-accent)!important}
+.sidebar-control{background:linear-gradient(145deg,var(--f-raised),var(--f-surface))!important;border-color:var(--f-line)!important;box-shadow:inset 0 1px var(--f-edge),0 2px 8px var(--f-shadow)}
+.sidebar-control h3{color:var(--f-fg)!important}.sidebar-control label{color:var(--f-muted)!important}
+.public-config-button,.processor-choice{color:var(--f-fg)!important}.processor-choice{background:var(--f-surface)!important;border-color:var(--f-line)!important}
+.public-config-button.active,.processor-choice.active{background:linear-gradient(105deg,var(--f-selection),var(--f-raised))!important;border-color:var(--f-accent)!important;color:var(--f-selectedText)!important;box-shadow:inset 2px 0 var(--f-accent)}
+.processor-choice>span,.disabled-processors summary{color:var(--f-muted)!important}
+.document-workspace,.document-panels,.asset-document,.asset-form-scroll{background:transparent!important}.file-tabs{background:var(--f-field)!important;border-color:var(--f-line)!important}
+.file-tab{border-color:var(--f-line)!important;color:var(--f-muted)!important}.file-tab.active{background:linear-gradient(180deg,var(--f-raised),var(--f-surface))!important;box-shadow:inset 0 2px var(--f-accent)!important;color:var(--f-selectedText)!important}.file-tab-close{color:var(--f-muted)!important}
+.asset-form{background:linear-gradient(135deg,var(--f-surface),var(--f-canvas))!important}
+.mount-table-heading,.mount-table thead th,.range-table thead th,.input-blend-table thead th{background:linear-gradient(180deg,var(--f-head),var(--f-surface))!important;color:var(--f-fg)!important;border-color:var(--f-line)!important;box-shadow:inset 0 1px var(--f-edge)}
+.mount-table tbody,.range-table tbody,.input-blend-table tbody{background:var(--f-surface)!important}
+.mount-table th,.mount-table td,.range-table th,.range-table td,.input-blend-table th,.input-blend-table td{border-color:var(--f-line)!important}
+.input-blend-table tbody th{background:var(--f-surface)!important}.range-disabled{color:var(--f-muted)!important}
+.asset-card{background:linear-gradient(150deg,var(--f-raised),var(--f-surface))!important;border-color:var(--f-line)!important;box-shadow:inset 0 1px var(--f-edge)}
+.asset-card-name{color:var(--f-fg)!important}.asset-card-actions{color:var(--f-muted)!important}.asset-card button{background:transparent!important}.asset-card button:hover{background:var(--f-hover)!important}
+input:not([type=checkbox]):not([type=range]),select,textarea,.adaptive-field input,.adaptive-field select,.adaptive-field textarea,.field-details,.vector-value-button{background:var(--f-field)!important;color:var(--f-fg)!important;border-color:var(--f-line)!important;box-shadow:inset 0 1px 3px var(--f-shadow)}
+input::placeholder,textarea::placeholder{color:var(--f-muted)!important;opacity:.85}input[type=checkbox],input[type=range]{accent-color:var(--f-accent)}input:focus-visible,select:focus-visible,button:focus-visible{outline-color:var(--f-accent)!important}
+.field-details:hover{border-color:var(--f-accent)!important;background:var(--f-selection)!important}
+.rig-asset-group>h2,.field-group,.field-group>summary{color:var(--f-fg)!important;border-color:var(--f-line)!important;background:var(--f-head)!important}
+.browser-host,.content-browser,.content-panel{background:var(--f-surface)!important}.browser-controls,.browser-path,.browser-navigation{background:var(--f-surface)!important;border-color:var(--f-line)!important}.browser-controls button.active{background:var(--f-selection)!important;color:var(--f-selectedText)!important}
+.breadcrumbs button,.browser-path>small{color:var(--f-muted)!important}.browser-tile{background:var(--f-raised)!important;border-color:var(--f-line)!important;box-shadow:inset 0 1px var(--f-edge)}.browser-tile.selected{background:var(--f-selection)!important;border-color:var(--f-accent)!important}
+.browser-tile b{color:var(--f-fg)!important}.browser-tile>small,.browser-footer,.directory-footer{color:var(--f-muted)!important;border-color:var(--f-line)!important}.browser-thumbnail{background:transparent!important;color:var(--f-accent)!important}
+.type-Rig{color:var(--f-rig)!important}.type-Input{color:var(--f-input)!important}.type-TransitionInput,.type-Value{color:var(--f-range)!important}.type-Curve{color:var(--f-curve)!important}.type-Range{color:var(--f-range)!important}.type-Pipeline,.type-InputBlend{color:var(--f-pipeline)!important}
+.statusbar{background:var(--f-surface)!important;color:var(--f-muted)!important;border-color:var(--f-line)!important;box-shadow:inset 0 1px var(--f-edge)}.status-dot,.live-dot{background:var(--f-accent)!important}.statusbar button{color:var(--f-muted)!important}
+.resize-handle{background:var(--f-canvas)!important}.resize-handle:hover{background:var(--f-accent)!important}::-webkit-scrollbar-thumb{background:var(--f-line)!important}
+.modal,.cell-panel,.context-menu{background:var(--f-raised)!important;color:var(--f-fg)!important;border-color:var(--f-line)!important}
+`;
+}
+(async()=>{
+ process.chdir(root);
+ const project=await fixture();await fs.mkdir(project.storage,{recursive:true});
+ await fs.writeFile(path.join(project.storage,'settings.json'),JSON.stringify({recent:[project.workspaceRoot]}));
+ const env={...process.env,CAMERA_EDITOR_TEST_DATA:project.storage};delete env.ELECTRON_RUN_AS_NODE;
+ const app=await electron.launch({executablePath:path.join(root,'release/win-unpacked/相机框架编辑器.exe'),env});
+ const page=await app.firstWindow(),errors=[];page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(30000);
+ try{
+  await page.locator('.recent button').click();await page.locator('.asset-workbench-body').waitFor();
+  const rig='Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/Dash.rig';
+  await page.evaluate(file=>window.cameraEditor.openFile({path:file,processor:'Input'}),rig);
+  await page.locator('[role=tabpanel][aria-label="'+rig+'"] [data-rig-group=Input]').waitFor();
+  await page.evaluate(()=>window.cameraEditor.reveal('Assets/Shared/CurveAssets/Bezier/Linear.curve'));
+  await page.locator('.browser-tile.type-Curve').first().waitFor();
+  await page.evaluate(()=>document.fonts.ready);
+  const style=await page.addStyleTag({content:'/* Preview theme */'});
+  const apply=async theme=>{await style.evaluate((node,text)=>node.textContent=text,css(theme));await page.mouse.move(0,0);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));};
+  for(const theme of themes){
+   await fs.writeFile(path.join(__dirname,theme.id+'.css'),css(theme));await apply(theme);
+   assert.equal(await page.locator('[data-rig-group=Input] [data-asset-card]').first().evaluate(node=>Math.round(node.getBoundingClientRect().width)),320);
+   await page.screenshot({path:path.join(__dirname,theme.id+'.png')});console.log(theme.id+'.png');
+  }
+  await page.evaluate(()=>window.cameraEditor.openFile({path:'Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/ValueAssets/Focus/Character/Dash_Player.transitionValue'}));
+  await page.locator('[role=tabpanel]:visible .value-table').waitFor();await apply(themes[0]);
+  await page.screenshot({path:path.join(__dirname,'04-frost-dark-channels.png')});console.log('04-frost-dark-channels.png');
+  assert.deepEqual(errors,[]);
+  console.log('PASS: actual 0.8.6 editor previews; original layout retained; no source assets or project documents modified.');
+ }finally{await app.evaluate(({app})=>app.exit(0)).catch(()=>{});await app.close().catch(()=>{});}
+})().catch(error=>{console.error(error);process.exitCode=1;});

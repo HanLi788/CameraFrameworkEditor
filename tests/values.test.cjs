@@ -4,22 +4,46 @@ before(async()=>{project=await fixture();});
 const base='Assets/GameplayCameraSystem/CameraAssets/InteractiveCamera/Dialogue/',focus=base+'InputAssets/Dialogue_Enter.transitionInput',unfocus=base+'InputAssets/Dialogue_Exit.transitionInput';
 const saveInvalid=async(doc,data)=>{await assert.rejects(()=>project.save({...doc,text:encode(data)}));assert.equal((await project.read(doc.path)).text,doc.text);};
 
-test('Enter and Exit expose transitionValue paths including the explicit default reference',async()=>{
+test('Enter and Exit both expose exact typed transitionValue targets',async()=>{
  const snapshot=await project.snapshot(),f=snapshot.assets.find(a=>a.path===focus),u=snapshot.assets.find(a=>a.path===unfocus);
- assert.ok(f.data.ValueAssets.length);assert.ok(f.refs.every(r=>r.type==='Value'));assert.equal(u.data.ValueAssets.length,0);assert.ok(u.refs.some(r=>r.field==='DefaultValueAsset'&&r.type==='Value'));assert.deepEqual((await project.validate()).issues,[]);
+ assert.ok(f.data.ValueAssets.length);assert.ok(f.refs.every(r=>r.type==='Value'));assert.ok(u.data.ValueAssets.length);assert.ok(!Object.hasOwn(u.data,'DefaultValueAsset'));assert.ok(u.refs.every(r=>r.type==='Value'));assert.deepEqual((await project.validate()).issues,[]);
  const doc=await project.read(focus),bad=JSON.parse(doc.text);bad.ValueAssets[0]='Shared/CurveAssets/Bezier/Linear.curve';await saveInvalid(doc,bad);
 });
 
 test('Enter requires unique targets, forbids defaults and rejects the old keyed target protocol',async()=>{
- const doc=await project.read(focus),original=JSON.parse(doc.text),defaultKey=JSON.parse((await project.read(unfocus)).text).DefaultValueAsset;
- for(const change of [d=>d.ValueAssets=[],d=>d.ValueAssets=[d.ValueAssets[0],d.ValueAssets[0]],d=>d.ValueAssets=[{Id:10001,Path:d.ValueAssets[0]}],d=>d.DefaultValueAsset=defaultKey,d=>d.ValueAssets=[defaultKey]]){const data=structuredClone(original);change(data);await saveInvalid(doc,data);}
+ const doc=await project.read(focus),original=JSON.parse(doc.text),defaultKey=JSON.parse((await project.read(unfocus)).text).ValueAssets[0];
+ for(const change of [d=>d.ValueAssets=[],d=>d.ValueAssets=[d.ValueAssets[0],d.ValueAssets[0]],d=>d.ValueAssets=[{Id:10001,Path:d.ValueAssets[0]}],d=>d.DefaultValueAsset=defaultKey]){const data=structuredClone(original);change(data);await saveInvalid(doc,data);}
 });
 
-test('Exit requires a default without PerformanceType and allows an empty specialized list',async()=>{
- const doc=await project.read(unfocus),data=JSON.parse(doc.text),f=JSON.parse((await project.read(focus)).text);
- await saveInvalid(doc,{...data,DefaultValueAsset:f.ValueAssets[0]});const noDefault={...data};delete noDefault.DefaultValueAsset;await saveInvalid(doc,noDefault);
- const target=await readReference(project,data.DefaultValueAsset);await saveInvalid(target,{...JSON.parse(target.text),PerformanceType:{BaseName:'PERFORMANCE_NPC'}});
+test('Exit requires exact performance targets and rejects default fields and empty lists',async()=>{
+ const doc=await project.read(unfocus),data=JSON.parse(doc.text);
+ await saveInvalid(doc,{...data,DefaultValueAsset:data.ValueAssets[0]});
+ await saveInvalid(doc,{...data,ValueAssets:[]});
+ const target=await readReference(project,data.ValueAssets[0]),raw=JSON.parse(target.text),missing={...raw};delete missing.PerformanceType;
+ await saveInvalid(target,missing);
  assert.deepEqual((await project.validate()).issues,[]);
+});
+
+test('transition enable is a mandatory boolean and false remains an explicit saved value',async()=>{
+ const doc=await readReference(project,JSON.parse((await project.read(focus)).text).ValueAssets[0]),data=JSON.parse(doc.text);
+ for(const value of [undefined,null,0,1,'false']){
+  const candidate={...data,bEnabled:value};if(value===undefined)delete candidate.bEnabled;
+  await saveInvalid(doc,candidate);
+ }
+ const saved=await project.save({...doc,text:encode({...data,bEnabled:false})});
+ assert.equal(JSON.parse(saved.text).bEnabled,false);
+ await project.save({...saved,text:doc.text});
+});
+
+test('creating a transition value explicitly enables it while copying preserves its disabled state',async()=>{
+ const source=await readReference(project,JSON.parse((await project.read(focus)).text).ValueAssets[0]);
+ const disabled=await project.save({...source,text:encode({...JSON.parse(source.text),bEnabled:false})});
+ for(const [kind,name,expected] of [['create-asset','New_Enabled',true],['copy','Copy_Disabled',false]]){
+  const file=base+'ValueAssets/Focus/'+name+'.transitionValue';
+  await project.mutate({kind,type:'Value',sourcePath:source.path,path:file,snapshotRevision:(await project.snapshot()).snapshotRevision});
+  assert.equal(JSON.parse((await project.read(file)).text).bEnabled,expected);
+ }
+ await project.save({...disabled,text:source.text});
 });
 
 test('structured performance identities reject invalid bases, numeric codes, null and old strings',async()=>{
@@ -41,8 +65,8 @@ test('performance code strings are literals during validation and transactional 
  await move(source,destination);assert.equal(JSON.parse((await project.read(doc.path)).text).PerformanceType.CodeName,literal);assert.deepEqual((await project.validate()).issues,[]);await move(destination,source);await project.save({...await project.read(doc.path),text:doc.text});
 });
 
-test('transition values have fifteen channels; value edits leave their mounting input unchanged',async()=>{
- const input=await project.read('Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/InputAssets/Dash_Enter.transitionInput'),target=await readReference(project,JSON.parse(input.text).ValueAssets[0]),data=JSON.parse(target.text);assert.equal(Object.keys(data.Channels).length,15);
+test('transition values have thirteen channels; value edits leave their mounting input unchanged',async()=>{
+ const input=await project.read('Assets/GameplayCameraSystem/CameraAssets/ActionCamera/Dash/InputAssets/Dash_Enter.transitionInput'),target=await readReference(project,JSON.parse(input.text).ValueAssets[0]),data=JSON.parse(target.text);assert.equal(Object.keys(data.Channels).length,13);
  const bad=structuredClone(data);bad.Channels.FOV.bEnabled=false;bad.Channels.FOV.Value=180;await saveInvalid(target,bad);
  data.Channels.Distance.Value+=10;const saved=await project.save({...target,text:encode(data)});assert.equal((await project.read(input.path)).text,input.text);await project.save({...saved,text:target.text});
 });

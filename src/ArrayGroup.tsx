@@ -9,7 +9,7 @@ export function orderHint(path:string){
   if(path==='Processors.Occlusion')return t('最多挂载一个遮挡资产；空数组关闭遮挡处理。');
   if(path==='Processors.Input.Assets')return t('逐通道选取最靠前的已启用且活跃的输入；零增量或零权重仍占有通道。进入、视点变化和退出分别使用独立的 Enter、Change、Exit 挂载。');
   if(path==='Processors.Effects')return t('按数组顺序求值，多个效果的输出贡献相加；输入不在定义域内时，该资产当帧不贡献效果。空数组不贡献效果。');
-  if(path==='ValueAssets')return t('Actor 目标按 BaseName 与可选 CodeName 精确匹配，序列目标按 SequenceId 匹配；Actor 退出无匹配项时使用 DefaultValueAsset。');
+  if(path==='ValueAssets')return t('Actor 目标按 BaseName 与可选 CodeName 精确匹配，序列目标按 SequenceId 匹配；进入、变化和退出都不使用默认目标。');
   return t('每个通道选取最靠前的启用配置；未启用的通道可由后续资产补充，不叠加同一通道的配置。空数组不挂载。');
 }
 
